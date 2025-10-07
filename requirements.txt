@@ -1,0 +1,18 @@
+#General
+numpy
+pydantic == 2.11.1
+#LLM
+langchain-openai
+transformers
+torch
+tensorflow
+langgraph == 0.6.8
+requests == 2.32.1 
+
+#Data
+pandas
+
+#Visualization
+matplotlib ==3.8.1
+seaborn ==0.13.2
+
