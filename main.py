@@ -7,7 +7,7 @@ import time
 from langchain_openai import ChatOpenAI
 from prompt import storyteller_prompt
 from config import OPENAI_API_BASE, OPENAI_API_MODEL, TEMPERATURE, MAX_TOKENS, LLM_REQUEST_TIMEOUT
-
+from utils import parse_storyteller_result
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 model = ChatOpenAI(
@@ -26,14 +26,21 @@ def background_story():
     #Update prompt
     start_time = time.time()
     prompt = re.sub(r"<outline>", user_outline, storyteller_prompt)
+
+    #Make LLM request
     print("Starting making request...")
     response = model.invoke(prompt)
     content = response.content
     end_time = time.time()
     print(f"Time taken for this request: {end_time - start_time} seconds")
 
+    #Parse response
+    title, background_story, tone, key_themes = parse_storyteller_result(content)
     #Print response
-    print(content)
+    print(f"Title: {title}")
+    print(f"Background Story: {background_story}")
+    print(f"Tone: {tone}")
+    print(f"Key Themes: {key_themes}")
 
 if __name__ == "__main__":
     background_story()
