@@ -1,13 +1,8 @@
 import os
-import sys
-import subprocess
-import re
-import json
-import time
 from langchain_openai import ChatOpenAI
-from prompt import storyteller_prompt
-from config import OPENAI_API_BASE, OPENAI_API_MODEL, TEMPERATURE, MAX_TOKENS, LLM_REQUEST_TIMEOUT
-from utils import parse_storyteller_result
+from utils.config import OPENAI_API_BASE, OPENAI_API_MODEL, TEMPERATURE, MAX_TOKENS, LLM_REQUEST_TIMEOUT
+from utils.agents import background_story
+#LLM Model Initialization
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 model = ChatOpenAI(
@@ -19,28 +14,19 @@ model = ChatOpenAI(
     temperature=TEMPERATURE,
 )
 
-def background_story():
-    #Customizable user input
-    user_outline = "I want a background story for a new Dungeons & Dragons campaign."
-
-    #Update prompt
-    start_time = time.time()
-    prompt = re.sub(r"<outline>", user_outline, storyteller_prompt)
-
-    #Make LLM request
-    print("Starting making request...")
-    response = model.invoke(prompt)
-    content = response.content
-    end_time = time.time()
-    print(f"Time taken for this request: {end_time - start_time} seconds")
-
-    #Parse response
-    title, background_story, tone, key_themes = parse_storyteller_result(content)
-    #Print response
-    print(f"Title: {title}")
-    print(f"Background Story: {background_story}")
-    print(f"Tone: {tone}")
-    print(f"Key Themes: {key_themes}")
+def main():
+    """
+    Some thoughts:
+    Step 1: Generate a background story for a new Dungeons & Dragons campaign.
+    Step 2: Generate a list of regions for the campaign based on the background story.
+    Step 3: Generate a list of characters for the campaign based on the background story and regions.
+    etc..
+    """
+    background_story_state = background_story(model)
+    print(background_story_state["title"])
+    print(background_story_state["background_story"])
+    print(background_story_state["tone"])
+    print(background_story_state["key_themes"])
 
 if __name__ == "__main__":
-    background_story()
+    main()
