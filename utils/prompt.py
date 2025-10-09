@@ -15,7 +15,7 @@ Your goal is to take the player’s outline and expand it into a detailed backgr
 5. Do **not** write dialogue or game stats — focus on atmosphere and story context only.
 
 # Output Format
-Return your result strictly in JSON format:
+Return your result strictly in JSON format and must have the following fields:
 {
   "title": "<short title of the story>",
   "background_story": "<the full story text>",
