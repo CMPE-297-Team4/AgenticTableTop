@@ -1,8 +1,10 @@
 #General
 numpy
 pydantic == 2.11.1
+PyYAML
 #LLM
 langchain-openai
+langchain-google-genai
 transformers
 torch
 tensorflow
