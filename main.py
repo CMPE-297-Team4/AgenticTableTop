@@ -1,6 +1,7 @@
 from utils.agents import background_story, generate_game_plan
-from utils.state import GameStatus
 from utils.model import initialize_llm
+from utils.state import GameStatus
+
 
 def main():
     """
@@ -12,10 +13,12 @@ def main():
     """
     model = initialize_llm()
     state = GameStatus()
-    
-    #Setting up the game, should be a one time process.
+
+    # Setting up the game, should be a one time process.
     background_story(model, state)
     generate_game_plan(model, state)
-    #TODO: Generate Specific quests for each act/ Generate NPC&Monsters. Load player character.
+    # TODO: Generate Specific quests for each act/ Generate NPC&Monsters. Load player character.
+
+
 if __name__ == "__main__":
     main()
