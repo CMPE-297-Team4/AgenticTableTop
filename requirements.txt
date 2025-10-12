@@ -1,20 +1,14 @@
-#General
-numpy
-pydantic == 2.11.1
+# Core Dependencies (Currently Used)
+pydantic==2.11.1
 PyYAML
-#LLM
+
+# LLM Providers (Currently Used)
 langchain-openai
 langchain-google-genai
-transformers
-torch
-tensorflow
-langgraph == 0.6.8
-requests == 2.32.1 
 
-#Data
-pandas
+# Agent Framework (For future multi-agent workflows)
+langgraph==0.6.8
 
-#Visualization
-matplotlib ==3.8.1
-seaborn ==0.13.2
-
+# Utilities (Commonly needed)
+numpy
+requests==2.32.1
