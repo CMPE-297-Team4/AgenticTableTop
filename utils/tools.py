@@ -48,6 +48,29 @@ def parse_acts_result(response):
         return []
 
 
+def parse_quests_result(response):
+    """
+    Parse the quests from the LLM response.
+    """
+    try:
+        # First try to parse if it's wrapped in ```json code blocks
+        if "```json" in response:
+            rsp = response.split("```json")[1].split("```")[0]
+        else:
+            # If not wrapped, try to find JSON in the response
+            rsp = response.strip()
+
+        # Clean up the response and try to parse as JSON
+        rsp = re.sub(r":\s*<([^>]+)>", r': "\1"', rsp)
+        json_data = json.loads(rsp)
+        quests = json_data.get("quests", [])
+        return quests
+    except Exception as e:
+        print(f"Error parsing quests result: {e}")
+        print(f"Response content: {response}")
+        return []
+
+
 def get_total_tokens(resp):
     # dict-style
     if isinstance(resp, dict):

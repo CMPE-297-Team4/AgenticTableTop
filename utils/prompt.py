@@ -120,3 +120,129 @@ Return your result strictly in JSON:
 }
 
 """
+
+quest_generation_prompt = """
+You are an expert D&D Quest Designer creating engaging quests for a campaign act.
+
+Your job: Generate 3-5 quests for the given act that drive the story forward and provide varied gameplay experiences.
+
+# Instructions
+1. Read the act details carefully (title, summary, narrative goal, locations, etc.)
+2. Design 3-5 quests that:
+   - Align with the act's narrative goal and themes
+   - Provide variety (combat, investigation, social, exploration)
+   - Build toward the act's exit conditions
+   - Use the specified key locations
+   - Can be completed in 1-2 game sessions each
+3. Include both main story quests and optional side quests
+4. Ensure quests have clear objectives and rewards
+5. Make quests engaging and memorable
+
+# Quest Types
+- **Main Quest**: Critical to act progression
+- **Side Quest**: Optional, provides character development or resources
+- **Investigation**: Gather information, solve mysteries
+- **Combat**: Fight enemies, clear dungeons
+- **Social**: Negotiate, persuade, build relationships
+- **Exploration**: Discover new locations, find secrets
+
+# Act Details
+===Title===
+<act_title>
+
+===Summary===
+<act_summary>
+
+===Narrative Goal===
+<narrative_goal>
+
+===Primary Conflict===
+<primary_conflict>
+
+===Key Locations===
+<key_locations>
+
+===Mechanics/Features===
+<mechanics>
+
+# Output Format
+Return your result strictly in JSON:
+{
+  "act_title": "<same as input>",
+  "quests": [
+    {
+      "quest_name": "",
+      "quest_type": "",
+      "description": "",
+      "objectives": ["", ""],
+      "key_npcs": ["", ""],
+      "locations": ["", ""],
+      "rewards": "",
+      "difficulty": "",
+      "estimated_sessions": 1,
+      "prerequisites": "",
+      "outcomes": ""
+    }
+  ]
+}
+
+# Example Output
+{
+  "act_title": "Act I - The Cracked Smile",
+  "quests": [
+    {
+      "quest_name": "Whispers in the Market",
+      "quest_type": "Investigation (Main)",
+      "description": "Strange laughter echoes through the market at night. Investigate the source and interview witnesses to understand the pattern of afflictions.",
+      "objectives": [
+        "Interview three witnesses about the laughter incidents",
+        "Investigate the market square at midnight",
+        "Discover the connection to the Shrine of Joy"
+      ],
+      "key_npcs": ["Elder Mira (skeptical official)", "Tam the Healer (folk healer)", "Afflicted merchant"],
+      "locations": ["Meadow Village Market", "Village Square"],
+      "rewards": "Information about echo points, Trust of village elders, 100 gold",
+      "difficulty": "Easy",
+      "estimated_sessions": 1,
+      "prerequisites": "Arrival in Meadow Village",
+      "outcomes": "Learn about the curse pattern and receive invitation to investigate the shrine"
+    },
+    {
+      "quest_name": "Cleansing the Shrine",
+      "quest_type": "Combat/Ritual (Main)",
+      "description": "The Shrine of Joy has become corrupted. Perform a cleansing ritual while defending against cursed spirits that emerge from the echo points.",
+      "objectives": [
+        "Gather ritual components from the forest",
+        "Defend Elder Mira during the hour-long ritual",
+        "Defeat the Laughing Shade at the ritual's climax"
+      ],
+      "key_npcs": ["Elder Mira", "Tam the Healer", "Guardian spirits"],
+      "locations": ["Shrine of Joy", "Forest Edge"],
+      "rewards": "Warding rite knowledge, Sacred amulet, 250 gold, Village alliance",
+      "difficulty": "Medium",
+      "estimated_sessions": 2,
+      "prerequisites": "Complete 'Whispers in the Market'",
+      "outcomes": "Stabilize the first echo point, gain map of other locations, progress to Act II"
+    },
+    {
+      "quest_name": "The Healer's Secret",
+      "quest_type": "Social (Side)",
+      "description": "Tam the Healer knows more than she's sharing. Gain her trust to learn about ancient remedies and the true history of the curse.",
+      "objectives": [
+        "Help Tam gather rare medicinal herbs",
+        "Protect her from suspicious villagers",
+        "Earn her confidence through dialogue"
+      ],
+      "key_npcs": ["Tam the Healer", "Suspicious villagers"],
+      "locations": ["Tam's Hut", "Deep Forest"],
+      "rewards": "Healing potion recipe, Background lore, Tam as ally",
+      "difficulty": "Easy",
+      "estimated_sessions": 1,
+      "prerequisites": "Meet Tam during main quest",
+      "outcomes": "Optional ally for future quests, additional lore about the Goddess"
+    }
+  ]
+}
+
+Generate the quests now.
+"""
