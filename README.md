@@ -3,6 +3,8 @@ CMPE297- Team 4 Project
 
 An AI-powered Dungeons & Dragons game simulator where AI agents take on multiple roles - Dungeon Master, NPCs, monsters, and more - to create dynamic, interactive tabletop RPG experiences.
 
+**New to D&D or this project?** Read the [Introduction Guide](INTRO.md) for a beginner-friendly explanation of what this does and why it's useful.
+
 ## Vision
 
 Build a complete D&D game simulator where:
@@ -16,16 +18,17 @@ Build a complete D&D game simulator where:
 
 - **Background Story Generation**: Creates immersive D&D campaign backgrounds from simple outlines
 - **Game Plan Generation**: Breaks down stories into structured acts with narrative goals and conflicts
+- **Quest Generation**: Generates 3-5 detailed quests per act with objectives, NPCs, locations, and rewards
 - **Multi-LLM Support**: Works with OpenAI GPT models and Google Gemini
 - **Dice Rolling**: Built-in dice rolling utilities for D&D mechanics
-- **Testing Infrastructure**: Comprehensive test suite with 29+ unit tests
+- **Testing Infrastructure**: Comprehensive test suite with 40+ unit tests
 
 ## Roadmap
 
 ### Phase 1: Content Generation (Current)
 - [x] Background story generation
 - [x] Multi-act game plan generation
-- [ ] Quest generation for each act
+- [x] Quest generation for each act
 - [ ] NPC generation with personalities
 - [ ] Monster generation with stat blocks
 - [ ] Player character loading
@@ -51,12 +54,16 @@ Build a complete D&D game simulator where:
 1. Clone the repository
 2. Install core dependencies:
 ```bash
+# Option 1: Using Makefile (recommended)
+make install
+
+# Option 2: Using pip directly
 pip install -r requirements.txt
 ```
 
 3. (Optional) Install heavy ML dependencies if needed:
 ```bash
-pip install -r requirements-optional.txt
+make install-all  # or: pip install -r requirements-optional.txt
 ```
 
 4. **Set up your API keys** (see [ENV_SETUP.md](ENV_SETUP.md) for detailed guide):
@@ -80,22 +87,30 @@ pip install -r requirements-optional.txt
 5. Configure the game in `config.yaml`
 6. Run the content generator (Phase 1):
 ```bash
-python main.py
+make run  # or: python main.py
 ```
 
-This will generate a campaign background and multi-act game plan. Interactive gameplay features are in development.
+This will generate:
+- Campaign background story with themes
+- Multi-act game plan (3-5 acts with narrative structure)
+- Detailed quests for each act (3-5 quests per act with descriptions and objectives)
+
+**Output includes:** Quest names, types, descriptions, and step-by-step objectives for DMs to run immediately.
+
+Interactive gameplay features are in development.
 
 ## Development
 
 ### Setup Development Environment
 
 ```bash
-# One-command setup (installs dependencies and sets up pre-commit hooks)
-bash scripts/setup_dev.sh
-```
+# Option 1: Using Makefile (recommended)
+make setup
 
-Or manually:
-```bash
+# Option 2: Using script
+bash scripts/setup_dev.sh
+
+# Option 3: Manually
 pip install -r requirements-dev.txt
 pre-commit install
 ```
@@ -103,23 +118,39 @@ pre-commit install
 ### Running Tests
 
 ```bash
-# Run all tests
-bash scripts/test.sh
+# Option 1: Using Makefile (recommended)
+make test              # Run all tests
+make coverage          # Run with coverage report
 
-# Or with pytest directly
+# Option 2: Using script
+bash scripts/test.sh   # Auto-detects coverage availability
+
+# Option 3: Using pytest directly
 pytest tests/ -v
 ```
 
 ### Code Formatting
 
 ```bash
-# Format and lint code
+# Option 1: Using Makefile (recommended)
+make format            # Format and lint code
+make check             # Check formatting without modifying files
+make lint              # Run linter only
+
+# Option 2: Using script
 bash scripts/format.sh
 
-# Or manually
+# Option 3: Manually
 black utils/ main.py tests/
 isort utils/ main.py tests/
 flake8 utils/ main.py tests/
+```
+
+### Available Make Commands
+
+Run `make` or `make help` to see all available commands:
+```bash
+make help
 ```
 
 ### Testing Infrastructure
@@ -168,6 +199,7 @@ AgenticTableTop/
 
 ## Documentation
 
+- **[INTRO.md](INTRO.md)** - Beginner-friendly introduction to D&D and this project (START HERE!)
 - **[ENV_SETUP.md](ENV_SETUP.md)** - Comprehensive environment variable setup guide
 - **[TESTING_SETUP.md](TESTING_SETUP.md)** - Complete testing infrastructure documentation
 - **[DEPENDENCIES.md](DEPENDENCIES.md)** - Dependency management and cleanup information
@@ -175,7 +207,18 @@ AgenticTableTop/
 ## Changelog
 
 ### 10/12/2025:
-- Added comprehensive testing infrastructure (29 unit tests)
+- Added quest generation system (generates 3-5 quests per act)
+- Enhanced quest output to display descriptions and objectives
+- Implemented quest parser and validator
+- Added quest generation prompt template
+- Created new unit tests for quest functionality
+- Updated game state to track quests per act
+- Created INTRO.md - beginner-friendly guide explaining D&D and the project
+- Added Makefile with convenient commands (make test, make format, make run, etc.)
+- Improved test script to gracefully handle missing pytest-cov
+
+### 10/12/2025:
+- Added comprehensive testing infrastructure
 - Set up code formatting (black, isort, flake8)
 - Added pre-commit hooks for code quality
 - Created helper scripts for development workflow
