@@ -2,7 +2,13 @@
 Unit tests for utils/tools.py
 """
 
-from utils.tools import dice_roll, get_total_tokens, parse_acts_result, parse_storyteller_result
+from utils.tools import (
+    dice_roll,
+    get_total_tokens,
+    parse_acts_result,
+    parse_quests_result,
+    parse_storyteller_result,
+)
 
 
 class TestParseStorytellerResult:
@@ -115,6 +121,37 @@ class TestDiceRoll:
             results.add(dice_roll(6))
         # Should have most or all values from 1-6
         assert len(results) >= 5  # Allow for slight statistical variance
+
+
+class TestParseQuestsResult:
+    """Tests for parse_quests_result function"""
+
+    def test_parse_valid_quests(self, sample_quests_response):
+        """Test parsing valid quests JSON"""
+        quests = parse_quests_result(sample_quests_response)
+        assert len(quests) == 2
+        assert quests[0]["quest_name"] == "Investigate the Strange Occurrences"
+        assert quests[1]["quest_name"] == "Secure the Perimeter"
+        assert quests[0]["quest_type"] == "Investigation (Main)"
+        assert "objectives" in quests[0]
+        assert len(quests[0]["objectives"]) == 3
+
+    def test_parse_invalid_json_returns_empty_list(self, invalid_json_response):
+        """Test that invalid JSON returns empty list"""
+        quests = parse_quests_result(invalid_json_response)
+        assert quests == []
+
+    def test_parse_json_without_quests_returns_empty_list(self):
+        """Test that JSON without 'quests' field returns empty list"""
+        response = '{"act_title": "Test", "other_field": "value"}'
+        quests = parse_quests_result(response)
+        assert quests == []
+
+    def test_parse_empty_quests_array(self):
+        """Test parsing JSON with empty quests array"""
+        response = '{"quests": []}'
+        quests = parse_quests_result(response)
+        assert quests == []
 
 
 class TestGetTotalTokens:

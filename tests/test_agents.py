@@ -4,7 +4,7 @@ Unit tests for utils/agents.py
 
 import pytest
 
-from utils.agents import background_story, generate_game_plan
+from utils.agents import background_story, generate_game_plan, generate_quests_for_act
 
 
 class TestBackgroundStory:
@@ -77,6 +77,55 @@ class TestGamePlan:
         mock_llm_with_acts.invoke.assert_called_once()
 
 
+class TestQuestGeneration:
+    """Tests for generate_quests_for_act function"""
+
+    def test_generate_quests_for_act_returns_true(
+        self, mock_llm_with_quests, populated_game_state_with_acts
+    ):
+        """Test that quest generation returns True on success"""
+        result = generate_quests_for_act(mock_llm_with_quests, populated_game_state_with_acts, 0)
+        assert result is True
+
+    def test_generate_quests_updates_state_with_quests(
+        self, mock_llm_with_quests, populated_game_state_with_acts
+    ):
+        """Test that quest generation updates state with quests"""
+        generate_quests_for_act(mock_llm_with_quests, populated_game_state_with_acts, 0)
+        assert "quests" in populated_game_state_with_acts
+        act_title = populated_game_state_with_acts["acts"][0]["act_title"]
+        assert act_title in populated_game_state_with_acts["quests"]
+        assert len(populated_game_state_with_acts["quests"][act_title]) > 0
+
+    def test_generate_quests_calls_llm_invoke(
+        self, mock_llm_with_quests, populated_game_state_with_acts
+    ):
+        """Test that quest generation calls the LLM's invoke method"""
+        generate_quests_for_act(mock_llm_with_quests, populated_game_state_with_acts, 0)
+        mock_llm_with_quests.invoke.assert_called_once()
+
+    def test_generate_quests_prints_quest_details(
+        self, mock_llm_with_quests, populated_game_state_with_acts, capsys
+    ):
+        """Test that quest generation prints quest name, type, description, and objectives"""
+        generate_quests_for_act(mock_llm_with_quests, populated_game_state_with_acts, 0)
+        captured = capsys.readouterr()
+
+        # Verify quest name is printed
+        assert "Quest 1: Test Quest 1" in captured.out
+
+        # Verify quest type is printed
+        assert "Type: Investigation (Main)" in captured.out
+
+        # Verify description is printed
+        assert "Description: A test quest" in captured.out
+
+        # Verify objectives are printed
+        assert "Objectives:" in captured.out
+        assert "1. Objective 1" in captured.out
+        assert "2. Objective 2" in captured.out
+
+
 # Additional fixtures specific to these tests
 @pytest.fixture
 def mock_llm_with_acts():
@@ -99,6 +148,35 @@ def mock_llm_with_acts():
                 "entry_requirements": "None",
                 "exit_conditions": "Complete introduction",
                 "handoff_notes_for_next_stage": ["prepare for act 2"]
+            }
+        ]
+    }
+    ```"""
+    return mock
+
+
+@pytest.fixture
+def mock_llm_with_quests():
+    """Mock LLM that returns quests response"""
+    from unittest.mock import Mock
+
+    mock = Mock()
+    mock.invoke.return_value.content = """```json
+    {
+        "act_title": "Act I - The Awakening",
+        "quests": [
+            {
+                "quest_name": "Test Quest 1",
+                "quest_type": "Investigation (Main)",
+                "description": "A test quest",
+                "objectives": ["Objective 1", "Objective 2"],
+                "key_npcs": ["NPC 1"],
+                "locations": ["Location 1"],
+                "rewards": "100 gold",
+                "difficulty": "Easy",
+                "estimated_sessions": 1,
+                "prerequisites": "None",
+                "outcomes": "Test outcome"
             }
         ]
     }

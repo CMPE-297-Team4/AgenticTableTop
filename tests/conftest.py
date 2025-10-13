@@ -116,3 +116,65 @@ def sample_acts_response():
 def invalid_json_response():
     """Invalid JSON response for error testing"""
     return "This is not valid JSON at all { broken }"
+
+
+@pytest.fixture
+def sample_quests_response():
+    """Sample LLM response for quest generation"""
+    return """```json
+    {
+        "act_title": "Act I - The Awakening",
+        "quests": [
+            {
+                "quest_name": "Investigate the Strange Occurrences",
+                "quest_type": "Investigation (Main)",
+                "description": "The village has been plagued by mysterious events.",
+                "objectives": ["Interview witnesses", "Examine the scene", "Report findings"],
+                "key_npcs": ["Village Elder", "Witness"],
+                "locations": ["Village Square", "Crime Scene"],
+                "rewards": "100 gold, Information",
+                "difficulty": "Easy",
+                "estimated_sessions": 1,
+                "prerequisites": "Arrive in village",
+                "outcomes": "Learn about the threat"
+            },
+            {
+                "quest_name": "Secure the Perimeter",
+                "quest_type": "Combat (Side)",
+                "description": "Defend the village from incoming threats.",
+                "objectives": ["Set up defenses", "Fight off attackers"],
+                "key_npcs": ["Guard Captain"],
+                "locations": ["Village Gates"],
+                "rewards": "250 gold, Reputation",
+                "difficulty": "Medium",
+                "estimated_sessions": 1,
+                "prerequisites": "Complete investigation",
+                "outcomes": "Village is safe"
+            }
+        ]
+    }
+    ```"""
+
+
+@pytest.fixture
+def populated_game_state_with_acts():
+    """Game state with acts populated for quest generation"""
+    state = GameStatus()
+    state["title"] = "The Shadow Realm"
+    state["background_story"] = "Long ago, in a forgotten kingdom..."
+    state["key_themes"] = ["darkness", "redemption"]
+    state["acts"] = [
+        {
+            "act_title": "Act I - The Awakening",
+            "act_summary": "Heroes discover strange occurrences.",
+            "narrative_goal": "Investigate disturbances",
+            "primary_conflict": "Local resistance",
+            "stakes": "Village safety",
+            "key_locations": ["Village Square", "Dark Forest"],
+            "mechanics_or_features_introduced": ["investigation"],
+            "entry_requirements": "None",
+            "exit_conditions": "Find source",
+            "handoff_notes_for_next_stage": ["needs dungeon"],
+        }
+    ]
+    return state
