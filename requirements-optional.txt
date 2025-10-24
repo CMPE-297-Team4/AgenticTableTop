@@ -1,16 +1,19 @@
 # Optional Dependencies for Future Features
 # Install only when needed: pip install -r requirements-optional.txt
-
-# Heavy ML Dependencies (for local models, embeddings, etc.)
-# These are NOT currently used in the codebase
-transformers
-torch
-tensorflow
+# NOTE: These are NOT currently used in the codebase
 
 # Data Analysis (for campaign analytics, visualization)
 pandas
 matplotlib==3.8.1
 seaborn==0.13.2
 
-# Note: sentencepiece is included with transformers when needed
+# Heavy ML Dependencies (REQUIRES system packages: brew install pkg-config cmake)
+# Uncomment only if you need local models/embeddings:
+# transformers
+# torch
+# tensorflow
 
+# Installation notes:
+# - transformers requires pkg-config (install via: brew install pkg-config)
+# - torch and tensorflow are large downloads (several GB)
+# - These packages are not needed for current D&D campaign generation

@@ -1,0 +1,249 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 220 15% 8%;
+    --foreground: 220 15% 85%;
+
+    --card: 220 15% 12%;
+    --card-foreground: 220 15% 90%;
+
+    --popover: 220 15% 10%;
+    --popover-foreground: 220 15% 90%;
+
+    --primary: 220 70% 50%;
+    --primary-foreground: 220 15% 95%;
+
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 220 15% 85%;
+
+    --muted: 220 15% 15%;
+    --muted-foreground: 220 10% 65%;
+
+    --accent: 280 60% 60%;
+    --accent-foreground: 220 15% 95%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 15% 20%;
+    --input: 220 15% 15%;
+    --ring: 220 70% 50%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 220 15% 6%;
+
+    --sidebar-foreground: 220 15% 90%;
+
+    --sidebar-primary: 220 70% 50%;
+
+    --sidebar-primary-foreground: 220 15% 95%;
+
+    --sidebar-accent: 280 60% 60%;
+
+    --sidebar-accent-foreground: 220 15% 95%;
+
+    --sidebar-border: 220 15% 15%;
+
+    --sidebar-ring: 220 70% 50%;
+  }
+
+  .dark {
+    --background: 220 15% 6%;
+    --foreground: 220 15% 90%;
+
+    --card: 220 15% 10%;
+    --card-foreground: 220 15% 95%;
+
+    --popover: 220 15% 8%;
+    --popover-foreground: 220 15% 95%;
+
+    --primary: 220 70% 55%;
+    --primary-foreground: 220 15% 95%;
+
+    --secondary: 220 15% 15%;
+    --secondary-foreground: 220 15% 90%;
+
+    --muted: 220 15% 12%;
+    --muted-foreground: 220 10% 70%;
+
+    --accent: 280 60% 65%;
+    --accent-foreground: 220 15% 95%;
+
+    --destructive: 0 65% 45%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 15% 18%;
+    --input: 220 15% 12%;
+    --ring: 220 70% 55%;
+    --sidebar-background: 220 15% 4%;
+    --sidebar-foreground: 220 15% 90%;
+    --sidebar-primary: 220 70% 55%;
+    --sidebar-primary-foreground: 220 15% 95%;
+    --sidebar-accent: 280 60% 65%;
+    --sidebar-accent-foreground: 220 15% 95%;
+    --sidebar-border: 220 15% 12%;
+    --sidebar-ring: 220 70% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+  
+  /* Gaming-specific enhancements */
+  .gaming-glow {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+  }
+  
+  .fantasy-border {
+    border: 1px solid hsl(var(--accent) / 0.5);
+    box-shadow: 0 0 10px hsl(var(--accent) / 0.2);
+  }
+  
+  .quest-card {
+    background: linear-gradient(135deg, hsl(var(--card)), hsl(var(--muted)));
+    border: 1px solid hsl(var(--border));
+    transition: all 0.3s ease;
+  }
+  
+  .quest-card:hover {
+    border-color: hsl(var(--accent));
+    box-shadow: 0 0 15px hsl(var(--accent) / 0.3);
+    transform: translateY(-2px);
+  }
+  
+  .act-highlight {
+    background: linear-gradient(135deg, hsl(var(--accent) / 0.1), hsl(var(--primary) / 0.1));
+    border: 2px solid hsl(var(--accent));
+    box-shadow: 0 0 20px hsl(var(--accent) / 0.4);
+  }
+  
+  /* Fantasy Background Effects */
+  .fantasy-bg {
+    background-image: 
+      radial-gradient(circle at 20% 80%, hsl(var(--primary) / 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, hsl(var(--accent) / 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 40% 40%, hsl(var(--primary) / 0.05) 0%, transparent 50%);
+  }
+  
+  .magical-shine {
+    background: linear-gradient(
+      45deg,
+      transparent 30%,
+      hsl(var(--primary) / 0.1) 50%,
+      transparent 70%
+    );
+    animation: shine 3s ease-in-out infinite;
+  }
+  
+  @keyframes shine {
+    0% { transform: translateX(-100%) skewX(-15deg); }
+    100% { transform: translateX(200%) skewX(-15deg); }
+  }
+  
+  .floating-particle {
+    animation: float 6s ease-in-out infinite;
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0px) rotate(0deg); }
+    50% { transform: translateY(-20px) rotate(180deg); }
+  }
+  
+  .magical-glow {
+    box-shadow: 
+      0 0 20px hsl(var(--primary) / 0.3),
+      0 0 40px hsl(var(--accent) / 0.2),
+      0 0 60px hsl(var(--primary) / 0.1);
+    border: none !important;
+    outline: none !important;
+  }
+  
+  /* Mystical text styling for story content */
+  .mystical-text {
+    font-family: 'Cinzel', 'Times New Roman', serif;
+    text-shadow: 0 0 10px hsl(var(--accent) / 0.3);
+    letter-spacing: 0.05em;
+    line-height: 1.8;
+  }
+  
+  /* Enhanced fantasy border for story */
+  .story-border {
+    border: 2px solid hsl(var(--accent) / 0.4);
+    box-shadow: 
+      0 0 20px hsl(var(--accent) / 0.2),
+      inset 0 0 20px hsl(var(--primary) / 0.1);
+    background: linear-gradient(135deg, 
+      hsl(var(--background) / 0.8), 
+      hsl(var(--card) / 0.6),
+      hsl(var(--background) / 0.8)
+    );
+  }
+  
+  .invisible-boundary {
+    border: none !important;
+    border-width: 0 !important;
+    border-style: none !important;
+    border-color: transparent !important;
+    outline: none !important;
+    outline-width: 0 !important;
+    outline-style: none !important;
+    outline-color: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background-clip: padding-box !important;
+  }
+  
+  .invisible-boundary.magical-glow {
+    box-shadow: 
+      0 0 20px hsl(var(--primary) / 0.3),
+      0 0 40px hsl(var(--accent) / 0.2),
+      0 0 60px hsl(var(--primary) / 0.1) !important;
+  }
+  
+  /* Override any Shadcn UI default styles */
+  .invisible-boundary[data-radix-collection-item] {
+    border: none !important;
+    outline: none !important;
+  }
+  
+  /* Target Card component specifically */
+  .invisible-boundary.card,
+  .invisible-boundary[role="region"],
+  .invisible-boundary[data-card] {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  
+  /* Override any potential focus states */
+  .invisible-boundary:focus,
+  .invisible-boundary:focus-visible,
+  .invisible-boundary:focus-within {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* Fix text clipping issues */
+  .text-no-clip {
+    line-height: 1.2 !important;
+    padding-bottom: 0.1em !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+  }
+}

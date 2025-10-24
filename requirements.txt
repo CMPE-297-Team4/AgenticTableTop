@@ -12,3 +12,8 @@ langgraph==0.6.8
 # Utilities (Commonly needed)
 numpy
 requests==2.32.1
+
+# API Framework (For web interface integration)
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6

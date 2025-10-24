@@ -1,27 +1,277 @@
 # AgenticTableTop
-CMPE297- Team 4 Project
+CMPE297 - Team 4 Project
 
-An AI-powered Dungeons & Dragons game simulator where AI agents take on multiple roles - Dungeon Master, NPCs, monsters, and more - to create dynamic, interactive tabletop RPG experiences.
+An AI-powered Dungeons & Dragons campaign generator with a beautiful web interface. Generate complete campaigns with story, acts, and quests in minutes!
 
-**New to D&D or this project?** Read the [Introduction Guide](INTRO.md) for a beginner-friendly explanation of what this does and why it's useful.
+**New to D&D?** Read the [Introduction Guide](docs/INTRO.md) first.
 
-## Vision
+## Features
 
-Build a complete D&D game simulator where:
-- **AI Dungeon Master** orchestrates the game, narrates events, and manages the world
-- **AI NPCs** with unique personalities interact with players
-- **AI Combat System** manages encounters with intelligent monster behavior
-- **Dynamic Storytelling** adapts to player choices in real-time
-- **Multi-Agent System** with specialized agents working together
+- **Beautiful Web UI** - React-based interface for campaign generation and viewing
+- **AI-Powered Generation** - Complete campaigns with OpenAI GPT or Google Gemini
+- **Story & Acts** - Multi-act narrative structure with goals and conflicts
+- **Detailed Quests** - 3-5 quests per act with objectives and descriptions
+- **REST API** - FastAPI backend for easy integration
+- **D&D Mechanics** - Built-in dice rolling and game utilities
 
-## Current Features (Phase 1)
+## Quick Start (5 Minutes)
 
-- **Background Story Generation**: Creates immersive D&D campaign backgrounds from simple outlines
-- **Game Plan Generation**: Breaks down stories into structured acts with narrative goals and conflicts
-- **Quest Generation**: Generates 3-5 detailed quests per act with objectives, NPCs, locations, and rewards
-- **Multi-LLM Support**: Works with OpenAI GPT models and Google Gemini
-- **Dice Rolling**: Built-in dice rolling utilities for D&D mechanics
-- **Testing Infrastructure**: Comprehensive test suite with 40+ unit tests
+### Prerequisites
+- Python 3.8+ ([Download](https://www.python.org/downloads/))
+- Node.js 16+ ([Download](https://nodejs.org/))
+- OpenAI API Key or Google Gemini API Key
+
+### Setup
+
+```bash
+# 1. Clone and install
+git clone <your-repo-url>
+cd AgenticTableTop
+pip install -r requirements.txt
+cd ui && npm install && cd ..
+
+# 2. Configure API keys
+cp env.example .env
+# Edit .env and add your API key (OPENAI_API_KEY or GEMINI_API_KEY)
+
+# 3. Start the application
+make start-all
+```
+
+### Generate Your First Campaign
+
+1. Open http://localhost:5173
+2. Enter a campaign idea:
+   ```
+   I want a dark fantasy campaign with ancient dragons,
+   political intrigue, and mysterious magical artifacts
+   ```
+3. Click "Generate Campaign" and wait 1-2 minutes
+4. Explore your complete campaign!
+
+**That's it!** You now have 3-5 acts and 10-20 detailed quests ready to play.
+
+## What You Get
+
+Each generated campaign includes:
+- **Background Story** - Rich lore and world-building
+- **Campaign Theme** - Overarching narrative tone
+- **3-5 Acts** - Structured story progression with:
+  - Act titles and summaries
+  - Narrative goals and stakes
+  - Key locations
+  - Entry/exit conditions
+- **10-20 Quests** - Detailed quest information:
+  - Quest names and types (Combat, Investigation, Social, Exploration)
+  - Full descriptions
+  - Step-by-step objectives
+  - Difficulty ratings
+  - Estimated play time
+
+## Usage Modes
+
+### Option 1: Web UI (Recommended)
+```bash
+make start-all
+# Opens: http://localhost:5173
+```
+Beautiful interface with campaign generator and interactive viewer.
+
+### Option 2: CLI
+```bash
+make run
+# or: python main.py
+```
+Generates campaigns directly in the terminal.
+
+### Option 3: API
+```bash
+make api
+# Access: http://localhost:8000/docs
+```
+Use the REST API for custom integrations.
+
+## Architecture
+
+### Full-Stack Application
+```
+┌─────────────────┐         ┌──────────────────┐
+│   Frontend UI   │ ◄─────► │  Backend API     │
+│   (React + TS)  │  REST   │  (FastAPI)       │
+│   localhost:5173│  API    │  localhost:8000  │
+└─────────────────┘         └──────────────────┘
+                                     │
+                                     ▼
+                            ┌──────────────────┐
+                            │  AI Agents       │
+                            │  (LangChain)     │
+                            │  - Story Gen     │
+                            │  - Act Planning  │
+                            │  - Quest Gen     │
+                            └──────────────────┘
+```
+
+### Data Flow
+```
+User Input → campaignApi.ts → POST /api/generate-campaign
+  → initialize_llm() → background_story() → generate_game_plan()
+  → generate_quests_for_act() → Campaign JSON
+  → sessionStorage → Game.tsx → Display
+```
+
+### API Endpoints
+
+**`POST /api/generate-campaign`** - Full campaign (story + acts + quests)
+```bash
+curl -X POST http://localhost:8000/api/generate-campaign \
+  -H "Content-Type: application/json" \
+  -d '{"outline": "epic fantasy quest"}'
+```
+
+**`POST /api/generate-story`** - Story only (faster preview)
+
+**`POST /api/generate-game-plan`** - Story + acts (no quests)
+
+**`GET /health`** - Health check
+
+See interactive docs at http://localhost:8000/docs
+
+## Project Structure
+
+```
+AgenticTableTop/
+├── README.md               # This file - main documentation
+├── api.py                  # FastAPI backend server
+├── main.py                 # CLI entry point
+├── config.yaml             # Game configuration
+├── Makefile                # Build and run commands
+├── requirements.txt        # Python dependencies
+│
+├── docs/                   # Documentation
+│   ├── INTRO.md            # Beginner's guide to D&D
+│   ├── INTEGRATION_GUIDE.md    # Technical integration details
+│   ├── ENV_SETUP.md        # Environment setup
+│   ├── TESTING_SETUP.md    # Testing guide
+│   └── DEPENDENCIES.md     # Dependency management
+│
+├── scripts/                # Utility scripts
+│   ├── start-backend.sh    # Start backend API
+│   ├── start-frontend.sh   # Start frontend UI
+│   ├── start-all.sh        # Start both
+│   ├── setup_dev.sh        # Development setup
+│   ├── test.sh             # Run tests
+│   └── format.sh           # Code formatting
+│
+├── utils/                  # Core Python modules
+│   ├── agents.py           # AI agents (story, planner, quests)
+│   ├── model.py            # LLM initialization
+│   ├── prompt.py           # Prompt templates
+│   ├── state.py            # Game state management
+│   └── tools.py            # Utilities (dice, parsers)
+│
+├── ui/                     # React frontend
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── Index.tsx   # Campaign generator
+│   │   │   └── Game.tsx    # Campaign viewer
+│   │   ├── services/
+│   │   │   └── campaignApi.ts  # Backend API client
+│   │   └── components/ui/  # Shadcn UI components
+│   └── package.json
+│
+└── tests/                  # Test suite
+    ├── test_agents.py
+    ├── test_model.py
+    └── test_tools.py
+```
+
+## Configuration
+
+### API Keys
+Required: At least one of these in `.env`:
+```bash
+OPENAI_API_KEY=sk-proj-your-key-here
+# OR
+GEMINI_API_KEY=AIza-your-key-here
+```
+
+Get API keys:
+- OpenAI: https://platform.openai.com/api-keys
+- Google Gemini: https://makersuite.google.com/app/apikey
+
+### Customization
+- **Game Settings**: Edit `config.yaml`
+- **LLM Model**: Edit `utils/model.py`
+- **Prompts**: Edit `utils/prompt.py`
+- **Frontend API URL**: Create `ui/.env` with `VITE_API_URL=http://localhost:8000`
+
+## Development
+
+### Setup Development Environment
+```bash
+make setup
+# or: bash scripts/setup_dev.sh
+```
+
+### Running Tests
+```bash
+make test              # Run all tests
+make coverage          # Run with coverage report
+```
+
+### Code Formatting
+```bash
+make format            # Format and lint code
+make check             # Check without modifying
+make lint              # Run linter only
+```
+
+### Available Commands
+```bash
+make help              # Show all commands
+make install           # Install dependencies
+make run               # Run CLI generator
+make api               # Start backend API
+make frontend          # Start frontend UI
+make start-all         # Start both
+make test              # Run tests
+make format            # Format code
+make clean             # Clean generated files
+```
+
+## Troubleshooting
+
+### "ModuleNotFoundError"
+```bash
+pip install -r requirements.txt
+```
+
+### "API key not found"
+1. Create `.env` file: `cp env.example .env`
+2. Add your actual API key (not the example text)
+3. Restart the backend server
+
+### "Cannot connect to backend"
+Make sure backend is running:
+```bash
+make api  # In a separate terminal
+```
+
+### "npm: command not found"
+Install Node.js from https://nodejs.org/
+
+### Campaign not loading in UI
+1. Generate a new campaign from the Index page
+2. Check browser console (F12) for errors
+3. Verify backend is running and accessible
+
+### Port already in use
+```bash
+# Kill process on port 8000
+lsof -ti:8000 | xargs kill -9
+
+# Or change port in api.py
+```
 
 ## Roadmap
 
@@ -29,214 +279,94 @@ Build a complete D&D game simulator where:
 - [x] Background story generation
 - [x] Multi-act game plan generation
 - [x] Quest generation for each act
+- [x] Web UI with campaign viewer
+- [x] REST API backend
 - [ ] NPC generation with personalities
 - [ ] Monster generation with stat blocks
-- [ ] Player character loading
 
 ### Phase 2: Interactive Game Master
-- [ ] AI Dungeon Master agent for real-time narration
+- [ ] AI Dungeon Master for real-time narration
 - [ ] Turn-based player action handling
 - [ ] Dynamic dialogue system with NPCs
 - [ ] Combat encounter management
 - [ ] Session state persistence
 
-### Phase 3: Advanced AI Agents
+### Phase 3: Advanced Features
 - [ ] Multi-agent collaboration (DM, NPCs, players)
 - [ ] RAG system for D&D rules knowledge
 - [ ] Campaign memory for consistency
 - [ ] Adaptive storytelling based on player choices
 - [ ] Voice interface for immersive gameplay
 
-## Setup
-
-### Installation
-
-1. Clone the repository
-2. Install core dependencies:
-```bash
-# Option 1: Using Makefile (recommended)
-make install
-
-# Option 2: Using pip directly
-pip install -r requirements.txt
-```
-
-3. (Optional) Install heavy ML dependencies if needed:
-```bash
-make install-all  # or: pip install -r requirements-optional.txt
-```
-
-4. **Set up your API keys** (see [ENV_SETUP.md](ENV_SETUP.md) for detailed guide):
-
-   You need at least ONE of these:
-   ```bash
-   export OPENAI_API_KEY="sk-proj-your-key-here"
-   # or
-   export GEMINI_API_KEY="AIza-your-key-here"
-   ```
-
-   **Quick setup:**
-   ```bash
-   # Copy example file
-   cp env.example .env
-   
-   # Edit .env with your actual keys
-   nano .env  # or use any text editor
-   ```
-
-5. Configure the game in `config.yaml`
-6. Run the content generator (Phase 1):
-```bash
-make run  # or: python main.py
-```
-
-This will generate:
-- Campaign background story with themes
-- Multi-act game plan (3-5 acts with narrative structure)
-- Detailed quests for each act (3-5 quests per act with descriptions and objectives)
-
-**Output includes:** Quest names, types, descriptions, and step-by-step objectives for DMs to run immediately.
-
-Interactive gameplay features are in development.
-
-## Development
-
-### Setup Development Environment
-
-```bash
-# Option 1: Using Makefile (recommended)
-make setup
-
-# Option 2: Using script
-bash scripts/setup_dev.sh
-
-# Option 3: Manually
-pip install -r requirements-dev.txt
-pre-commit install
-```
-
-### Running Tests
-
-```bash
-# Option 1: Using Makefile (recommended)
-make test              # Run all tests
-make coverage          # Run with coverage report
-
-# Option 2: Using script
-bash scripts/test.sh   # Auto-detects coverage availability
-
-# Option 3: Using pytest directly
-pytest tests/ -v
-```
-
-### Code Formatting
-
-```bash
-# Option 1: Using Makefile (recommended)
-make format            # Format and lint code
-make check             # Check formatting without modifying files
-make lint              # Run linter only
-
-# Option 2: Using script
-bash scripts/format.sh
-
-# Option 3: Manually
-black utils/ main.py tests/
-isort utils/ main.py tests/
-flake8 utils/ main.py tests/
-```
-
-### Available Make Commands
-
-Run `make` or `make help` to see all available commands:
-```bash
-make help
-```
-
-### Testing Infrastructure
-
-The project includes comprehensive testing infrastructure:
-- **Unit tests** for all utility functions and agents
-- **Mock LLM fixtures** for testing without API calls
-- **Code coverage reporting** (when pytest-cov is installed)
-- **Pre-commit hooks** for automatic code formatting and linting
-
-## Project Structure
-
-```
-AgenticTableTop/
-├── main.py                 # Entry point
-├── config.yaml            # Game configuration
-├── utils/
-│   ├── agents.py          # Agent implementations (storyteller, game planner)
-│   ├── model.py           # LLM initialization and configuration
-│   ├── prompt.py          # Prompt templates
-│   ├── state.py           # Game state management
-│   └── tools.py           # Utility functions (parsers, dice rolling)
-├── tests/                 # Test suite
-│   ├── conftest.py        # Test fixtures
-│   ├── test_agents.py     # Agent tests
-│   ├── test_tools.py      # Utility function tests
-│   └── test_model.py      # LLM initialization tests
-└── scripts/               # Helper scripts
-    ├── setup_dev.sh       # Development environment setup
-    ├── test.sh            # Run tests
-    └── format.sh          # Format code
-```
-
-## Configuration
-
-### Current Phase (Content Generation)
-- **Game Settings**: Edit `config.yaml` to customize background story generation
-- **LLM Settings**: Edit `utils/model.py` to change model type, temperature, and token limits
-- **Prompts**: Customize prompts in `utils/prompt.py` for different campaign styles
-
-### Future Configuration (Interactive Gameplay)
-- Game Master personality and behavior
-- NPC dialogue styles
-- Combat difficulty and AI behavior
-- House rules and custom D&D mechanics
-
 ## Documentation
 
-- **[INTRO.md](INTRO.md)** - Beginner-friendly introduction to D&D and this project (START HERE!)
-- **[ENV_SETUP.md](ENV_SETUP.md)** - Comprehensive environment variable setup guide
-- **[TESTING_SETUP.md](TESTING_SETUP.md)** - Complete testing infrastructure documentation
-- **[DEPENDENCIES.md](DEPENDENCIES.md)** - Dependency management and cleanup information
+- **[docs/INTRO.md](docs/INTRO.md)** - Beginner's guide to D&D and this project *(Start here!)*
+- **[docs/INTEGRATION_GUIDE.md](docs/INTEGRATION_GUIDE.md)** - Detailed architecture and integration
+- **[docs/ENV_SETUP.md](docs/ENV_SETUP.md)** - Environment variable setup guide
+- **[docs/TESTING_SETUP.md](docs/TESTING_SETUP.md)** - Testing infrastructure
+- **[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)** - Dependency management
 
-## Changelog
+## Technology Stack
 
-### 10/12/2025:
-- Added quest generation system (generates 3-5 quests per act)
-- Enhanced quest output to display descriptions and objectives
-- Implemented quest parser and validator
-- Added quest generation prompt template
-- Created new unit tests for quest functionality
-- Updated game state to track quests per act
-- Created INTRO.md - beginner-friendly guide explaining D&D and the project
-- Added Makefile with convenient commands (make test, make format, make run, etc.)
-- Improved test script to gracefully handle missing pytest-cov
+### Backend
+- Python 3.8+
+- FastAPI - Modern web framework
+- Uvicorn - ASGI server
+- LangChain - LLM orchestration
+- Pydantic - Data validation
+- OpenAI GPT / Google Gemini - AI models
 
-### 10/12/2025:
-- Added comprehensive testing infrastructure
-- Set up code formatting (black, isort, flake8)
-- Added pre-commit hooks for code quality
-- Created helper scripts for development workflow
-- Added .gitignore and project configuration files
-- Cleaned up requirements.txt to only include used dependencies
-- Created requirements-optional.txt for heavy ML packages
-
-### 10/11/2025:
-- Added sample Dice rolling function
-- Added Game planning agent that transforms the generic background story into different acts with more details breakdown
-- Added GEMINI API support for trying different models
+### Frontend
+- React 18 + TypeScript
+- Vite - Fast build tool
+- Tailwind CSS + Shadcn UI
+- React Router - Navigation
+- TanStack Query - State management
 
 ## Contributing
 
-1. Set up the development environment: `bash scripts/setup_dev.sh`
+1. Set up development environment: `make setup`
 2. Make your changes
-3. Run tests: `bash scripts/test.sh`
-4. Format code: `bash scripts/format.sh`
-5. Commit your changes (pre-commit hooks will run automatically)
+3. Run tests: `make test`
+4. Format code: `make format`
+5. Commit changes (pre-commit hooks run automatically)
 
-For more details, see [TESTING_SETUP.md](TESTING_SETUP.md).
+See [docs/TESTING_SETUP.md](docs/TESTING_SETUP.md) for more details.
+
+## Changelog
+
+### 10/23/2025 - Project Restructure
+- Organized all scripts into `/scripts` folder
+- Moved documentation to `/docs` folder
+- Cleaned up root directory structure
+- Updated README with clearer organization
+- Updated Makefile and scripts to use new paths
+
+### 10/23/2025 - Full-Stack Integration
+- Added React-based Web UI with campaign generator and viewer
+- Created FastAPI backend API with REST endpoints
+- Integrated frontend with backend via REST API
+- Added startup scripts (`make start-all`)
+- Removed Supabase authentication for local-first development
+- Created comprehensive integration documentation
+
+### 10/12/2025 - Quest System
+- Added quest generation system (3-5 quests per act)
+- Enhanced quest output with descriptions and objectives
+- Created INTRO.md for beginners
+- Added Makefile commands
+- Improved test infrastructure
+
+### 10/11/2025 - Initial Release
+- Background story generation
+- Game planning agent with multi-act structure
+- GEMINI API support
+- Dice rolling utilities
+
+## License
+
+See [LICENSE](LICENSE) file for details.
+
+---
+
+**Ready to create epic D&D campaigns?** Run `make start-all` and start adventuring!
