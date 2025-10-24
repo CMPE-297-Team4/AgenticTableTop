@@ -1,4 +1,4 @@
-.PHONY: help test format setup run clean coverage install install-dev install-all lint check
+.PHONY: help test format setup run clean coverage install install-dev install-all lint check api frontend start-all
 
 # Default target - show help
 help:
@@ -20,7 +20,10 @@ help:
 	@echo "  make check          - Run format check without modifying files"
 	@echo ""
 	@echo "Runtime Commands:"
-	@echo "  make run            - Run the campaign generator"
+	@echo "  make run            - Run the campaign generator (CLI)"
+	@echo "  make api            - Start the backend API server"
+	@echo "  make frontend       - Start the frontend UI"
+	@echo "  make start-all      - Start both backend and frontend"
 	@echo ""
 	@echo "Cleanup Commands:"
 	@echo "  make clean          - Remove generated files and caches"
@@ -73,10 +76,22 @@ check:
 	@echo "Running flake8..."
 	@flake8 utils/ main.py tests/
 
-# Run the main application
+# Run the main application (CLI)
 run:
 	@echo "Running D&D Campaign Generator..."
 	@python main.py
+
+# Run the backend API
+api:
+	@bash scripts/start-backend.sh
+
+# Run the frontend UI
+frontend:
+	@bash scripts/start-frontend.sh
+
+# Start both backend and frontend
+start-all:
+	@bash scripts/start-all.sh
 
 # Clean up generated files
 clean:
