@@ -55,6 +55,18 @@ export interface Story {
   theme: string;
 }
 
+export interface NPCImageRequest {
+  npc_name: string;
+  npc_description: string;
+  quest_context?: string;
+}
+
+export interface NPCImageResponse {
+  npc_name: string;
+  image_base64: string;
+  prompt_used: string;
+}
+
 /**
  * Generate a complete D&D campaign with story, acts, and quests
  */
@@ -122,6 +134,36 @@ export async function generateGamePlan(
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(error.detail || `Failed to generate game plan: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Generate a portrait image for an NPC
+ */
+export async function generateNPCImage(
+  npcName: string,
+  npcDescription: string,
+  questContext?: string
+): Promise<NPCImageResponse> {
+  const request: NPCImageRequest = {
+    npc_name: npcName,
+    npc_description: npcDescription,
+    quest_context: questContext,
+  };
+
+  const response = await fetch(`${API_BASE_URL}/api/generate-npc-image`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `Failed to generate NPC image: ${response.statusText}`);
   }
 
   return response.json();
