@@ -34,6 +34,9 @@ campaign.log
 backend.log
 frontend.log
 
+# LLM Cache files
+cache/
+
 # Environment files with secrets (DO NOT COMMIT)
 .env
 .env.local
