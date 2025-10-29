@@ -82,6 +82,7 @@ export interface SaveCampaignRequest {
   campaign_data: Campaign;
   user_id?: string;
   tags?: string[];
+}
 export interface NPCImageRequest {
   npc_name: string;
   npc_description: string;

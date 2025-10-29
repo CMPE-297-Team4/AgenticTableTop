@@ -263,7 +263,7 @@ async def generate_campaign(request: CampaignRequest):
 
         # Cache the response if caching is enabled
         if cache_enabled:
-            cache_response(cache_key, response_data, "campaign")
+            cache_response(cache_key, campaign_response.dict(), "campaign")
             print(f"Cached campaign response for: {request.outline[:50]}...")
         
         # Save to Pinecone if requested
@@ -381,7 +381,7 @@ async def generate_game_plan_only(request: CampaignRequest):
             }
             transformed_acts.append(transformed_act)
 
-        return {
+        response_data = {
             "title": state.get("title", DEFAULT_CAMPAIGN_TITLE),
             "background": state.get("background_story", ""),
             "theme": state.get("key_themes", [""])[0] if state.get("key_themes") else "",

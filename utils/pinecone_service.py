@@ -239,7 +239,7 @@ class PineconeService:
             description=quest_data.get("description", ""),
             objectives=quest_data.get("objectives", []),
             difficulty=quest_data.get("difficulty", ""),
-            estimated_time=quest_data.get("estimated_time", ""),
+            estimated_time=str(quest_data.get("estimated_time", "")),
             npcs=quest_data.get("npcs", []),
             locations=quest_data.get("locations", []),
             rewards=quest_data.get("rewards", ""),
