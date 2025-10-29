@@ -251,7 +251,6 @@ async def generate_campaign(request: CampaignRequest):
                 transformed_quest_list.append(transformed_quest)
             transformed_quests[act_title] = transformed_quest_list
 
-<<<<<<< HEAD
         campaign_response = CampaignResponse(
             title=state.get("title", DEFAULT_CAMPAIGN_TITLE),
             background=state.get("background_story", ""),
@@ -276,25 +275,6 @@ async def generate_campaign(request: CampaignRequest):
                 # Don't fail the request if Pinecone save fails
         
         return campaign_response
-=======
-        # Create response
-        response_data = {
-            "title": state.get("title", "Untitled Campaign"),
-            "background": state.get("background_story", ""),
-            "theme": state.get("key_themes", [""])[0] if state.get("key_themes") else "",
-            "acts": transformed_acts,
-            "quests": transformed_quests,
-            "total_acts": len(state.get("acts", [])),
-            "total_quests": total_quests,
-        }
-
-        # Cache the response if caching is enabled
-        if cache_enabled:
-            cache_response(cache_key, response_data, "campaign")
-            print(f"Cached campaign response for: {request.outline[:50]}...")
-
-        return CampaignResponse(**response_data)
->>>>>>> main
     except Exception as e:
         print(f"Error generating campaign: {str(e)}")
         print(traceback.format_exc())
@@ -330,13 +310,6 @@ async def generate_story_only(request: CampaignRequest):
         # Generate only the background story
         background_story(model, state)
 
-<<<<<<< HEAD
-        return StoryResponse(
-            title=state.get("title", DEFAULT_CAMPAIGN_TITLE),
-            background=state.get("background_story", ""),
-            theme=state.get("key_themes", [""])[0] if state.get("key_themes") else "",
-        )
-=======
         # Create response
         response_data = {
             "title": state.get("title", "Untitled Campaign"),
@@ -350,7 +323,6 @@ async def generate_story_only(request: CampaignRequest):
             print(f"Cached story response for: {request.outline[:50]}...")
 
         return StoryResponse(**response_data)
->>>>>>> main
     except Exception as e:
         print(f"Error generating story: {str(e)}")
         print(traceback.format_exc())
@@ -404,14 +376,8 @@ async def generate_game_plan_only(request: CampaignRequest):
             }
             transformed_acts.append(transformed_act)
 
-<<<<<<< HEAD
         return {
             "title": state.get("title", DEFAULT_CAMPAIGN_TITLE),
-=======
-        # Create response
-        response_data = {
-            "title": state.get("title", "Untitled Campaign"),
->>>>>>> main
             "background": state.get("background_story", ""),
             "theme": state.get("key_themes", [""])[0] if state.get("key_themes") else "",
             "acts": transformed_acts,
@@ -430,7 +396,6 @@ async def generate_game_plan_only(request: CampaignRequest):
         raise HTTPException(status_code=500, detail=f"Failed to generate game plan: {str(e)}")
 
 
-<<<<<<< HEAD
 @app.post("/api/save-campaign")
 async def save_campaign(request: SaveCampaignRequest):
     """
@@ -547,7 +512,6 @@ async def delete_campaign(campaign_id: str):
         print(f"Error deleting campaign: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to delete campaign: {str(e)}")
-=======
 @app.post("/api/generate-npc-image", response_model=NPCImageResponse)
 async def generate_npc_image(request: NPCImageRequest):
     """
@@ -606,7 +570,6 @@ async def generate_npc_image(request: NPCImageRequest):
         print(f"Error generating NPC image: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to generate NPC image: {str(e)}")
->>>>>>> main
 
 
 if __name__ == "__main__":
