@@ -13,6 +13,9 @@ An AI-powered Dungeons & Dragons campaign generator with a beautiful web interfa
 - **Detailed Quests** - 3-5 quests per act with objectives and descriptions
 - **REST API** - FastAPI backend for easy integration
 - **D&D Mechanics** - Built-in dice rolling and game utilities
+- **🆕 Vector Storage** - Pinecone integration for campaign persistence and semantic search
+- **🆕 Campaign Library** - Search and retrieve previously generated campaigns
+- **🆕 RAG System** - Retrieve relevant content for enhanced AI generation
 
 ## Quick Start (5 Minutes)
 
@@ -20,6 +23,7 @@ An AI-powered Dungeons & Dragons campaign generator with a beautiful web interfa
 - Python 3.8+ ([Download](https://www.python.org/downloads/))
 - Node.js 16+ ([Download](https://nodejs.org/))
 - OpenAI API Key or Google Gemini API Key
+- Pinecone API Key (optional, for vector storage)
 
 ### Setup
 
@@ -32,7 +36,11 @@ cd ui && npm install && cd ..
 
 # 2. Configure API keys
 cp env.example .env
-# Edit .env and add your API key (OPENAI_API_KEY or GEMINI_API_KEY)
+# Edit .env and add your API keys (OPENAI_API_KEY or GEMINI_API_KEY)
+# Optional: Add Pinecone keys for vector storage (PINECONE_API_KEY, PINECONE_ENVIRONMENT)
+
+# 2b. Optional: Set up Pinecone integration
+bash scripts/setup_pinecone.sh
 
 # 3. Start the application
 make start-all
