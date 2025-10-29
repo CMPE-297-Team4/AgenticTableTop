@@ -247,6 +247,35 @@ make format            # Format code
 make clean             # Clean generated files
 ```
 
+### LLM Response Caching
+
+For local development, LLM responses are cached to reduce API calls and improve iteration speed.
+
+**Cache Configuration:**
+```bash
+# In your .env file
+LLM_CACHE_ENABLED=true          # Enable/disable caching
+LLM_CACHE_EXPIRY_HOURS=24       # Cache expiry time (hours)
+```
+
+**Cache Management:**
+- **Cache Directory**: `cache/llm_responses/` (auto-created)
+- **Cache Stats**: `GET /api/cache/stats` - View cache statistics
+- **Clear Cache**: `POST /api/cache/clear` - Remove all cached responses
+- **Cleanup Expired**: `POST /api/cache/cleanup` - Remove expired entries
+
+**Testing Cache:**
+```bash
+python test_cache.py  # Test caching functionality
+```
+
+**Cache Behavior:**
+- Campaign generation responses are cached by outline + model type
+- Story generation responses are cached separately
+- NPC image generation responses are cached by NPC details
+- Cache files expire after 24 hours (configurable)
+- Cache is automatically excluded from git commits
+
 ## Troubleshooting
 
 ### "ModuleNotFoundError"
