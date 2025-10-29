@@ -260,6 +260,11 @@ async def generate_campaign(request: CampaignRequest):
             total_acts=len(state.get("acts", [])),
             total_quests=total_quests,
         )
+
+        # Cache the response if caching is enabled
+        if cache_enabled:
+            cache_response(cache_key, response_data, "campaign")
+            print(f"Cached campaign response for: {request.outline[:50]}...")
         
         # Save to Pinecone if requested
         if request.save_to_pinecone:
