@@ -3,14 +3,19 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut } from "lucide-react";
-import { generateCampaign, type Campaign } from "@/services/campaignApi";
+import { Loader2, LogOut, Library, Save } from "lucide-react";
+import { generateCampaign, type Campaign, type CampaignRequest } from "@/services/campaignApi";
 import { useAuth } from "@/hooks/useAuth";
 
 const Index = () => {
   const [outline, setOutline] = useState("I want a dark fantasy campaign with dragons and ancient ruins.");
   const [loading, setLoading] = useState(false);
+  const [saveToPinecone, setSaveToPinecone] = useState(false);
+  const [userId, setUserId] = useState("");
+  const [tags, setTags] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
   const { logout, loading: authLoading } = useAuth();
@@ -35,14 +40,21 @@ const Index = () => {
 
     setLoading(true);
     try {
-      const campaign: Campaign = await generateCampaign({ outline });
+      const request: CampaignRequest = {
+        outline,
+        save_to_pinecone: saveToPinecone,
+        user_id: userId || undefined,
+        tags: tags ? tags.split(",").map(t => t.trim()).filter(t => t) : undefined
+      };
+      
+      const campaign: Campaign = await generateCampaign(request);
       
       // Store campaign in sessionStorage for Game page
       sessionStorage.setItem("currentCampaign", JSON.stringify(campaign));
       
       toast({
         title: "Success!",
-        description: `Generated "${campaign.title}" with ${campaign.total_acts} acts and ${campaign.total_quests} quests!`,
+        description: `Generated "${campaign.title}" with ${campaign.total_acts} acts and ${campaign.total_quests} quests!${saveToPinecone ? " Saved to Pinecone." : ""}`,
       });
       
       // Navigate to game page
@@ -79,10 +91,34 @@ const Index = () => {
       <div className="absolute inset-0 magical-shine"></div>
       
       <Card className="w-full max-w-2xl p-8 space-y-6 invisible-boundary magical-glow relative z-10 backdrop-blur-sm bg-card/95 border-0 outline-0 shadow-none ring-0">
-        <div className="text-center space-y-2">
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-accent to-accent/80 bg-clip-text text-transparent leading-tight text-no-clip">
+        {/* Header with Navigation */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-accent to-accent/80 bg-clip-text text-transparent leading-tight text-no-clip">
             AgenticTableTop
           </h1>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/library")}
+              className="text-foreground hover:text-primary"
+            >
+              <Library className="h-4 w-4 mr-2" />
+              Library
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={logout}
+              className="text-foreground hover:text-primary"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        </div>
+        
+        <div className="text-center space-y-2">
           <p className="text-xl text-muted-foreground">
             AI-Powered D&D Campaign Generator
           </p>
@@ -104,6 +140,51 @@ const Index = () => {
             <p className="text-xs text-muted-foreground">
               Example: "I want a high fantasy campaign with political intrigue, dragon riders, and ancient magical artifacts"
             </p>
+          </div>
+
+          {/* Pinecone Storage Options */}
+          <div className="space-y-4 pt-4 border-t border-border/50">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="save-to-pinecone"
+                checked={saveToPinecone}
+                onCheckedChange={(checked) => setSaveToPinecone(checked as boolean)}
+              />
+              <label
+                htmlFor="save-to-pinecone"
+                className="text-sm font-medium text-foreground cursor-pointer"
+              >
+                Save to Campaign Library (Pinecone)
+              </label>
+            </div>
+            
+            {saveToPinecone && (
+              <div className="space-y-3 pl-6">
+                <div>
+                  <label className="text-sm text-muted-foreground">
+                    User ID (optional)
+                  </label>
+                  <Input
+                    placeholder="Enter user ID for organization"
+                    value={userId}
+                    onChange={(e) => setUserId(e.target.value)}
+                    className="text-foreground"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm text-muted-foreground">
+                    Tags (comma-separated)
+                  </label>
+                  <Input
+                    placeholder="e.g., dark-fantasy, dragons, mystery"
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                    className="text-foreground"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <Button 

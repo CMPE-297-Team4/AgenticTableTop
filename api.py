@@ -7,9 +7,13 @@ import os
 import traceback
 from typing import Any, Dict, List, Optional
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# Load environment variables from .env file
+load_dotenv()
 
 from utils.agents import background_story, generate_game_plan, generate_quests_for_act
 from utils.character_generator import generate_npc_portrait
@@ -22,6 +26,10 @@ from utils.llm_cache import (
 )
 from utils.model import initialize_llm
 from utils.state import GameStatus
+from utils.pinecone_service import pinecone_service
+
+# Constants
+DEFAULT_CAMPAIGN_TITLE = "Untitled Campaign"
 
 app = FastAPI(
     title="AgenticTableTop API",
@@ -44,6 +52,9 @@ class CampaignRequest(BaseModel):
 
     outline: Optional[str] = "I want a background story for a new Dungeons & Dragons campaign."
     model_type: Optional[str] = "openai"  # or "gemini"
+    save_to_pinecone: Optional[bool] = False  # Whether to save to Pinecone
+    user_id: Optional[str] = None  # User ID for Pinecone storage
+    tags: Optional[List[str]] = []  # Tags for Pinecone storage
 
 
 class CampaignResponse(BaseModel):
@@ -66,6 +77,27 @@ class StoryResponse(BaseModel):
     theme: str
 
 
+class SaveCampaignRequest(BaseModel):
+    """Request model for saving campaign to Pinecone"""
+    
+    campaign_data: CampaignResponse
+    user_id: Optional[str] = None
+    tags: Optional[List[str]] = []
+
+
+class SearchRequest(BaseModel):
+    """Request model for searching campaigns"""
+    
+    query: str
+    user_id: Optional[str] = None
+    limit: Optional[int] = 10
+
+
+class SearchResponse(BaseModel):
+    """Response model for search results"""
+    
+    results: List[Dict[str, Any]]
+    total: int
 class NPCImageRequest(BaseModel):
     """Request model for NPC image generation"""
 
@@ -219,23 +251,35 @@ async def generate_campaign(request: CampaignRequest):
                 transformed_quest_list.append(transformed_quest)
             transformed_quests[act_title] = transformed_quest_list
 
-        # Create response
-        response_data = {
-            "title": state.get("title", "Untitled Campaign"),
-            "background": state.get("background_story", ""),
-            "theme": state.get("key_themes", [""])[0] if state.get("key_themes") else "",
-            "acts": transformed_acts,
-            "quests": transformed_quests,
-            "total_acts": len(state.get("acts", [])),
-            "total_quests": total_quests,
-        }
+        campaign_response = CampaignResponse(
+            title=state.get("title", DEFAULT_CAMPAIGN_TITLE),
+            background=state.get("background_story", ""),
+            theme=state.get("key_themes", [""])[0] if state.get("key_themes") else "",
+            acts=transformed_acts,
+            quests=transformed_quests,
+            total_acts=len(state.get("acts", [])),
+            total_quests=total_quests,
+        )
 
         # Cache the response if caching is enabled
         if cache_enabled:
-            cache_response(cache_key, response_data, "campaign")
+            cache_response(cache_key, campaign_response.dict(), "campaign")
             print(f"Cached campaign response for: {request.outline[:50]}...")
-
-        return CampaignResponse(**response_data)
+        
+        # Save to Pinecone if requested
+        if request.save_to_pinecone:
+            try:
+                campaign_id = pinecone_service.store_campaign(
+                    campaign_data=campaign_response.dict(),
+                    user_id=request.user_id,
+                    tags=request.tags or []
+                )
+                print(f"Campaign saved to Pinecone with ID: {campaign_id}")
+            except Exception as e:
+                print(f"Warning: Failed to save campaign to Pinecone: {e}")
+                # Don't fail the request if Pinecone save fails
+        
+        return campaign_response
     except Exception as e:
         print(f"Error generating campaign: {str(e)}")
         print(traceback.format_exc())
@@ -337,9 +381,8 @@ async def generate_game_plan_only(request: CampaignRequest):
             }
             transformed_acts.append(transformed_act)
 
-        # Create response
         response_data = {
-            "title": state.get("title", "Untitled Campaign"),
+            "title": state.get("title", DEFAULT_CAMPAIGN_TITLE),
             "background": state.get("background_story", ""),
             "theme": state.get("key_themes", [""])[0] if state.get("key_themes") else "",
             "acts": transformed_acts,
@@ -358,6 +401,122 @@ async def generate_game_plan_only(request: CampaignRequest):
         raise HTTPException(status_code=500, detail=f"Failed to generate game plan: {str(e)}")
 
 
+@app.post("/api/save-campaign")
+async def save_campaign(request: SaveCampaignRequest):
+    """
+    Save a generated campaign to Pinecone vector database
+    
+    This endpoint stores the campaign data for future retrieval and similarity search
+    """
+    try:
+        campaign_id = pinecone_service.store_campaign(
+            campaign_data=request.campaign_data.dict(),
+            user_id=request.user_id
+        )
+        
+        return {
+            "success": True,
+            "campaign_id": campaign_id,
+            "message": "Campaign saved successfully"
+        }
+    except Exception as e:
+        print(f"Error saving campaign: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to save campaign: {str(e)}")
+
+
+@app.post("/api/search-campaigns", response_model=SearchResponse)
+async def search_campaigns(request: SearchRequest):
+    """
+    Search for campaigns using vector similarity
+    
+    This endpoint allows finding campaigns based on semantic similarity to the query
+    """
+    try:
+        results = pinecone_service.search_campaigns(
+            query=request.query,
+            user_id=request.user_id,
+            limit=request.limit
+        )
+        
+        return SearchResponse(
+            results=results,
+            total=len(results)
+        )
+    except Exception as e:
+        print(f"Error searching campaigns: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to search campaigns: {str(e)}")
+
+
+@app.post("/api/search-quests", response_model=SearchResponse)
+async def search_quests(request: SearchRequest):
+    """
+    Search for quests using vector similarity
+    
+    This endpoint allows finding quests based on semantic similarity to the query
+    """
+    try:
+        results = pinecone_service.search_quests(
+            query=request.query,
+            limit=request.limit
+        )
+        
+        return SearchResponse(
+            results=results,
+            total=len(results)
+        )
+    except Exception as e:
+        print(f"Error searching quests: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to search quests: {str(e)}")
+
+
+@app.get("/api/campaign/{campaign_id}")
+async def get_campaign(campaign_id: str):
+    """
+    Retrieve a specific campaign by ID
+    
+    This endpoint fetches campaign metadata from Pinecone
+    """
+    try:
+        campaign = pinecone_service.get_campaign_by_id(campaign_id)
+        
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        
+        return campaign
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error retrieving campaign: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve campaign: {str(e)}")
+
+
+@app.delete("/api/campaign/{campaign_id}")
+async def delete_campaign(campaign_id: str):
+    """
+    Delete a campaign and all related data
+    
+    This endpoint removes the campaign and its quests from Pinecone
+    """
+    try:
+        success = pinecone_service.delete_campaign(campaign_id)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete campaign")
+        
+        return {
+            "success": True,
+            "message": "Campaign deleted successfully"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting campaign: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to delete campaign: {str(e)}")
 @app.post("/api/generate-npc-image", response_model=NPCImageResponse)
 async def generate_npc_image(request: NPCImageRequest):
     """
