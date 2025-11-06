@@ -7,14 +7,16 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, MapPin, Users, Clock, Star, Target, AlertTriangle, CheckCircle, Sword, Shield, Scroll, BookOpen, Compass, Crown, Gem, Flame, Zap, Eye, Heart, Skull, Crosshair, Trophy, Key, Lock, Trash2, Home, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, MapPin, Users, Clock, Star, Target, AlertTriangle, CheckCircle, Sword, Shield, Scroll, BookOpen, Compass, Crown, Gem, Flame, Zap, Eye, Heart, Skull, Crosshair, Trophy, Key, Lock, Trash2, Home, ChevronLeft, ChevronRight, LogOut } from "lucide-react";
 import type { Campaign } from "@/services/campaignApi";
 import { NPCImageGenerator } from "@/components/NPCImageGenerator";
 import { NPCImageCache } from "@/utils/npcImageCache";
+import { useAuth } from "@/contexts/AuthContext";
 import monsterImage from "@/assets/dnd-monster.png";
 
 const Game = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [currentActIndex, setCurrentActIndex] = useState(0);
   const [cacheStats, setCacheStats] = useState({ totalCached: 0, totalSize: 0 });
@@ -145,7 +147,11 @@ const Game = () => {
           <Button variant="outline" size="sm" onClick={handleBack} className="border-border/50 text-foreground hover:bg-accent/20 hover:text-accent-foreground gaming-glow">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Generator
-        </Button>
+          </Button>
+          <Button variant="outline" size="sm" onClick={logout} className="border-border/50 text-foreground hover:bg-accent/20 hover:text-accent-foreground gaming-glow">
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </Button>
         </div>
       </header>
 

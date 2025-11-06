@@ -3,39 +3,58 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Sword, Shield, Scroll } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Loader2, Sword, Shield, Scroll, UserPlus } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isRegister, setIsRegister] = useState(false);
+  const [email, setEmail] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const navigate = useNavigate();
+  const { login: authLogin, register: authRegister } = useAuth();
 
-  const handleLogin = async () => {
+  const handleSubmit = async () => {
     if (!username.trim() || !password.trim()) {
       setError('Please enter both username and password');
       return;
     }
 
+    if (isRegister) {
+      if (!email.trim()) {
+        setError('Please enter your email');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        return;
+      }
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters');
+        return;
+      }
+    }
+
     setLoading(true);
     setError('');
     
-    // Simulate login process - accept any non-empty credentials for demo
-    setTimeout(() => {
-      setLoading(false);
-      
-      // For demo purposes, accept any username/password combination
-      if (username.trim() && password.trim()) {
-        // Store user session
-        sessionStorage.setItem('user', username);
-        sessionStorage.setItem('isAuthenticated', 'true');
-        navigate('/campaign');
+    try {
+      if (isRegister) {
+        await authRegister(username, email, password);
       } else {
-        setError('Please enter both username and password');
+        await authLogin(username, password);
       }
-    }, 1000);
+      navigate('/campaign');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Authentication failed';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -73,8 +92,46 @@ const Login: React.FC = () => {
           </p>
         </div>
 
-        {/* Login Form */}
+        {/* Toggle between Login and Register */}
+        <div className="flex gap-2 mb-4">
+          <Button
+            variant={!isRegister ? "default" : "outline"}
+            onClick={() => setIsRegister(false)}
+            className="flex-1"
+            disabled={loading}
+          >
+            Login
+          </Button>
+          <Button
+            variant={isRegister ? "default" : "outline"}
+            onClick={() => setIsRegister(true)}
+            className="flex-1"
+            disabled={loading}
+          >
+            <UserPlus className="mr-2 h-4 w-4" />
+            Sign Up
+          </Button>
+        </div>
+
+        {/* Form */}
         <div className="space-y-4">
+          {isRegister && (
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-card-foreground font-semibold">
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email..."
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="bg-card/50 border-border text-card-foreground placeholder:text-muted-foreground focus:border-accent focus:ring-accent/20"
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+              />
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="username" className="text-card-foreground font-semibold">
               Username
@@ -86,7 +143,7 @@ const Login: React.FC = () => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="bg-card/50 border-border text-card-foreground placeholder:text-muted-foreground focus:border-accent focus:ring-accent/20"
-              onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
             />
           </div>
 
@@ -101,9 +158,26 @@ const Login: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="bg-card/50 border-border text-card-foreground placeholder:text-muted-foreground focus:border-accent focus:ring-accent/20"
-              onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
             />
           </div>
+
+          {isRegister && (
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-card-foreground font-semibold">
+                Confirm Password
+              </Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="Confirm your password..."
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="bg-card/50 border-border text-card-foreground placeholder:text-muted-foreground focus:border-accent focus:ring-accent/20"
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+              />
+            </div>
+          )}
 
           {error && (
             <div className="text-red-500 text-sm text-center bg-red-500/10 p-2 rounded border border-red-500/20">
@@ -112,27 +186,31 @@ const Login: React.FC = () => {
           )}
 
           <Button
-            onClick={handleLogin}
-            disabled={loading || !username.trim() || !password.trim()}
+            onClick={handleSubmit}
+            disabled={loading || !username.trim() || !password.trim() || (isRegister && (!email.trim() || !confirmPassword.trim()))}
             className="w-full h-12 text-lg magical-glow hover:shadow-lg transition-all duration-300 hover:scale-105 bg-gradient-to-r from-accent to-accent/80 hover:from-accent/90 hover:to-accent/70 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Entering Realm...
+                {isRegister ? 'Creating Account...' : 'Entering Realm...'}
               </>
             ) : (
               <>
-                <Sword className="mr-2 h-5 w-5" />
-                Begin Adventure
+                {isRegister ? (
+                  <>
+                    <UserPlus className="mr-2 h-5 w-5" />
+                    Create Account
+                  </>
+                ) : (
+                  <>
+                    <Sword className="mr-2 h-5 w-5" />
+                    Begin Adventure
+                  </>
+                )}
               </>
             )}
           </Button>
-        </div>
-
-        {/* Footer */}
-        <div className="text-center text-sm text-muted-foreground">
-          <p>Demo Mode: Enter any username and password to continue</p>
         </div>
       </Card>
     </div>

@@ -6,12 +6,36 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+/**
+ * Get authentication token from localStorage
+ */
+function getAuthToken(): string | null {
+  return localStorage.getItem('auth_token');
+}
+
+/**
+ * Get headers with authentication if available
+ */
+function getAuthHeaders(): HeadersInit {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  
+  const token = getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return headers;
+}
+
 export interface CampaignRequest {
   outline?: string;
   model_type?: 'openai' | 'gemini';
   save_to_pinecone?: boolean;
   user_id?: string;
   tags?: string[];
+  force_new?: boolean;  // Force new generation, bypass cache
 }
 
 export interface Quest {
@@ -87,12 +111,48 @@ export interface NPCImageRequest {
   npc_name: string;
   npc_description: string;
   quest_context?: string;
+  campaign_id?: string;
 }
 
 export interface NPCImageResponse {
   npc_name: string;
   image_base64: string;
   prompt_used: string;
+}
+
+export interface UserRegister {
+  username: string;
+  email: string;
+  password: string;
+}
+
+export interface UserLogin {
+  username: string;
+  password: string;
+}
+
+export interface Token {
+  access_token: string;
+  token_type: string;
+  user_id: number;
+  username: string;
+}
+
+export interface UserInfo {
+  id: number;
+  username: string;
+  email: string;
+  is_active: boolean;
+}
+
+export interface NPCImageListItem {
+  id: number;
+  npc_name: string;
+  npc_description: string | null;
+  quest_context: string | null;
+  campaign_id: string | null;
+  created_at: string | null;
+  has_image: boolean;
 }
 
 /**
@@ -103,9 +163,7 @@ export async function generateCampaign(
 ): Promise<Campaign> {
   const response = await fetch(`${API_BASE_URL}/api/generate-campaign`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify(request),
   });
 
@@ -131,9 +189,7 @@ export async function saveCampaign(
 ): Promise<{ success: boolean; campaign_id: string; message: string }> {
   const response = await fetch(`${API_BASE_URL}/api/save-campaign`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify(request),
   });
 
@@ -153,9 +209,7 @@ export async function searchCampaigns(
 ): Promise<SearchResponse> {
   const response = await fetch(`${API_BASE_URL}/api/search-campaigns`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify(request),
   });
 
@@ -175,9 +229,7 @@ export async function searchQuests(
 ): Promise<SearchResponse> {
   const response = await fetch(`${API_BASE_URL}/api/search-quests`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify(request),
   });
 
@@ -195,9 +247,7 @@ export async function searchQuests(
 export async function getCampaign(campaignId: string): Promise<any> {
   const response = await fetch(`${API_BASE_URL}/api/campaign/${campaignId}`, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {
@@ -214,9 +264,7 @@ export async function getCampaign(campaignId: string): Promise<any> {
 export async function deleteCampaign(campaignId: string): Promise<{ success: boolean; message: string }> {
   const response = await fetch(`${API_BASE_URL}/api/campaign/${campaignId}`, {
     method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {
@@ -235,9 +283,7 @@ export async function generateStory(
 ): Promise<Story> {
   const response = await fetch(`${API_BASE_URL}/api/generate-story`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify(request),
   });
 
@@ -257,9 +303,7 @@ export async function generateGamePlan(
 ): Promise<Partial<Campaign>> {
   const response = await fetch(`${API_BASE_URL}/api/generate-game-plan`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify(request),
   });
 
@@ -272,30 +316,247 @@ export async function generateGamePlan(
 }
 
 /**
- * Generate a portrait image for an NPC
+ * Register a new user
+ */
+export async function register(userData: UserRegister): Promise<UserInfo> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(error.detail || `Failed to register: ${response.statusText}`);
+    }
+
+    return response.json();
+  } catch (error) {
+    // Handle network errors
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      throw new Error(
+        `Cannot connect to backend server at ${API_BASE_URL}. ` +
+        `Please make sure the backend is running. ` +
+        `Check the console for more details.`
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Login and get access token
+ */
+export async function login(credentials: UserLogin): Promise<Token> {
+  try {
+    const formData = new FormData();
+    formData.append('username', credentials.username);
+    formData.append('password', credentials.password);
+
+    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(error.detail || `Failed to login: ${response.statusText}`);
+    }
+
+    const token = await response.json();
+    
+    // Store token in localStorage
+    localStorage.setItem('auth_token', token.access_token);
+    localStorage.setItem('user_id', token.user_id.toString());
+    localStorage.setItem('username', token.username);
+    
+    return token;
+  } catch (error) {
+    // Handle network errors
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      throw new Error(
+        `Cannot connect to backend server at ${API_BASE_URL}. ` +
+        `Please make sure the backend is running. ` +
+        `Check the console for more details.`
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Get current user information
+ */
+export async function getCurrentUser(): Promise<UserInfo> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `Failed to get user info: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Logout (clear stored token)
+ */
+export function logout(): void {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('user_id');
+  localStorage.removeItem('username');
+}
+
+/**
+ * Generate or retrieve NPC image
+ * Checks database first, then generates if not found
  */
 export async function generateNPCImage(
   npcName: string,
   npcDescription: string,
-  questContext?: string
+  questContext?: string,
+  campaignId?: string
 ): Promise<NPCImageResponse> {
   const request: NPCImageRequest = {
     npc_name: npcName,
     npc_description: npcDescription,
     quest_context: questContext,
+    campaign_id: campaignId,
   };
 
   const response = await fetch(`${API_BASE_URL}/api/generate-npc-image`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify(request),
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(error.detail || `Failed to generate NPC image: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get a specific NPC image by name
+ */
+export async function getNPCImage(
+  npcName: string,
+  campaignId?: string
+): Promise<NPCImageResponse> {
+  const params = new URLSearchParams();
+  if (campaignId) {
+    params.append('campaign_id', campaignId);
+  }
+
+  const url = `${API_BASE_URL}/api/npc-images/${encodeURIComponent(npcName)}${params.toString() ? '?' + params.toString() : ''}`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `Failed to get NPC image: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * List all NPC images
+ */
+export async function listNPCImages(
+  campaignId?: string,
+  npcName?: string
+): Promise<NPCImageListItem[]> {
+  const params = new URLSearchParams();
+  if (campaignId) {
+    params.append('campaign_id', campaignId);
+  }
+  if (npcName) {
+    params.append('npc_name', npcName);
+  }
+
+  const url = `${API_BASE_URL}/api/npc-images${params.toString() ? '?' + params.toString() : ''}`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `Failed to list NPC images: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Delete an NPC image
+ */
+export async function deleteNPCImage(imageId: number): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/npc-images/${imageId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `Failed to delete NPC image: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * List all campaigns for the current user
+ */
+export async function listUserCampaigns(): Promise<Array<{
+  id: number;
+  title: string;
+  theme: string;
+  background: string;
+  created_at: string | null;
+  updated_at: string | null;
+}>> {
+  const response = await fetch(`${API_BASE_URL}/api/user/campaigns`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `Failed to list campaigns: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Load a specific campaign by ID
+ */
+export async function loadCampaign(campaignId: number): Promise<Campaign> {
+  const response = await fetch(`${API_BASE_URL}/api/user/campaigns/${campaignId}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `Failed to load campaign: ${response.statusText}`);
   }
 
   return response.json();

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Image, RefreshCw, AlertCircle, Eye } from 'lucide-react';
-import { generateNPCImage } from '@/services/campaignApi';
+import { generateNPCImage, getNPCImage } from '@/services/campaignApi';
 import { NPCImageCache } from '@/utils/npcImageCache';
 import { toast } from 'sonner';
 
@@ -11,6 +11,7 @@ interface NPCImageGeneratorProps {
   npcName: string;
   npcDescription: string;
   questContext?: string;
+  campaignId?: string;  // Optional campaign ID for database lookup
   className?: string;
 }
 
@@ -23,6 +24,7 @@ export const NPCImageGenerator: React.FC<NPCImageGeneratorProps> = ({
   npcName,
   npcDescription,
   questContext,
+  campaignId,
   className = '',
 }) => {
   const [loading, setLoading] = useState(false);
@@ -30,23 +32,52 @@ export const NPCImageGenerator: React.FC<NPCImageGeneratorProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
 
-  // Load cached image on component mount
+  // Load existing image from database or cache on component mount (but don't auto-generate)
   useEffect(() => {
-    const cached = NPCImageCache.getCachedImage(npcName);
-    if (cached) {
-      setGeneratedImage({
-        image_base64: cached.image_base64,
-        prompt_used: cached.prompt_used
-      });
-    }
-  }, [npcName]);
+    const loadExistingImage = async () => {
+      // First, check local cache for instant display
+      const cached = NPCImageCache.getCachedImage(npcName);
+      if (cached) {
+        setGeneratedImage({
+          image_base64: cached.image_base64,
+          prompt_used: cached.prompt_used
+        });
+      }
+      
+      // Then check database for stored image
+      try {
+        const dbImage = await getNPCImage(npcName, campaignId);
+        if (dbImage) {
+          setGeneratedImage({
+            image_base64: dbImage.image_base64,
+            prompt_used: dbImage.prompt_used
+          });
+          // Update cache with database image
+          NPCImageCache.saveToCache(npcName, dbImage);
+        }
+      } catch (err) {
+        // Image not found in database - that's okay, user can generate it
+        // Only log if it's not a 404
+        if (err instanceof Error && !err.message.includes('not found')) {
+          console.error(`Error loading image from database for ${npcName}:`, err);
+        }
+      }
+    };
+
+    loadExistingImage();
+  }, [npcName, campaignId]);
 
   const handleGenerateImage = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const result = await generateNPCImage(npcName, npcDescription, questContext);
+      // Call generateNPCImage - backend will:
+      // 1. Check database first
+      // 2. Return existing image if found
+      // 3. Generate new image if not found
+      // 4. Save to database
+      const result = await generateNPCImage(npcName, npcDescription, questContext, campaignId);
       setGeneratedImage(result);
       NPCImageCache.saveToCache(npcName, result);
       toast.success(`Portrait generated for ${npcName}!`);
@@ -59,12 +90,25 @@ export const NPCImageGenerator: React.FC<NPCImageGeneratorProps> = ({
     }
   };
 
-  const handleRegenerate = () => {
-    setGeneratedImage(null);
+  const handleRegenerate = async () => {
+    setLoading(true);
     setError(null);
+    setGeneratedImage(null);
     // Clear cache when regenerating
     NPCImageCache.clearCache(npcName);
-    handleGenerateImage();
+    
+    try {
+      const result = await generateNPCImage(npcName, npcDescription, questContext, campaignId);
+      setGeneratedImage(result);
+      NPCImageCache.saveToCache(npcName, result);
+      toast.success(`Portrait regenerated for ${npcName}!`);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to regenerate image';
+      setError(errorMessage);
+      toast.error(`Failed to regenerate portrait: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClearCache = () => {

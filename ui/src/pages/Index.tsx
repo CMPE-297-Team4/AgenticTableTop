@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, Library, Save } from "lucide-react";
-import { generateCampaign, type Campaign, type CampaignRequest } from "@/services/campaignApi";
-import { useAuth } from "@/hooks/useAuth";
+import { Loader2, LogOut, Library, User, Play, Scroll } from "lucide-react";
+import { generateCampaign, loadCampaign, listUserCampaigns, type Campaign, type CampaignRequest } from "@/services/campaignApi";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const [outline, setOutline] = useState("I want a dark fantasy campaign with dragons and ancient ruins.");
@@ -16,9 +17,38 @@ const Index = () => {
   const [saveToPinecone, setSaveToPinecone] = useState(false);
   const [userId, setUserId] = useState("");
   const [tags, setTags] = useState("");
+  const [savedCampaigns, setSavedCampaigns] = useState<Array<{
+    id: number;
+    title: string;
+    theme: string;
+    background: string;
+    created_at: string | null;
+    updated_at: string | null;
+  }>>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { logout, loading: authLoading } = useAuth();
+  const { logout, loading: authLoading, user } = useAuth();
+
+  // Load saved campaigns on mount
+  useEffect(() => {
+    if (!authLoading && user) {
+      loadSavedCampaigns();
+    }
+  }, [authLoading, user]);
+
+  const loadSavedCampaigns = async () => {
+    setLoadingCampaigns(true);
+    try {
+      const campaigns = await listUserCampaigns();
+      setSavedCampaigns(campaigns);
+    } catch (error: any) {
+      console.error("Error loading campaigns:", error);
+      // Don't show error toast, just log it
+    } finally {
+      setLoadingCampaigns(false);
+    }
+  };
 
   if (authLoading) {
     return (
@@ -44,7 +74,8 @@ const Index = () => {
         outline,
         save_to_pinecone: saveToPinecone,
         user_id: userId || undefined,
-        tags: tags ? tags.split(",").map(t => t.trim()).filter(t => t) : undefined
+        tags: tags ? tags.split(",").map(t => t.trim()).filter(Boolean) : undefined,
+        force_new: true  // Always generate a new campaign, bypass cache
       };
       
       const campaign: Campaign = await generateCampaign(request);
@@ -54,8 +85,11 @@ const Index = () => {
       
       toast({
         title: "Success!",
-        description: `Generated "${campaign.title}" with ${campaign.total_acts} acts and ${campaign.total_quests} quests!${saveToPinecone ? " Saved to Pinecone." : ""}`,
+        description: `Generated "${campaign.title}" with ${campaign.total_acts} acts and ${campaign.total_quests} quests! Campaign saved to your library.`,
       });
+      
+      // Reload saved campaigns
+      await loadSavedCampaigns();
       
       // Navigate to game page
       navigate("/game");
@@ -64,6 +98,33 @@ const Index = () => {
       toast({
         title: "Error",
         description: error.message || "Failed to generate campaign. Make sure the backend is running.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoadCampaign = async (campaignId: number) => {
+    setLoading(true);
+    try {
+      const campaign = await loadCampaign(campaignId);
+      
+      // Store campaign in sessionStorage for Game page
+      sessionStorage.setItem("currentCampaign", JSON.stringify(campaign));
+      
+      toast({
+        title: "Campaign Loaded!",
+        description: `Loaded "${campaign.title}"`,
+      });
+      
+      // Navigate to game page
+      navigate("/game");
+    } catch (error: any) {
+      console.error("Error loading campaign:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load campaign.",
         variant: "destructive",
       });
     } finally {
@@ -96,7 +157,13 @@ const Index = () => {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-accent to-accent/80 bg-clip-text text-transparent leading-tight text-no-clip">
             AgenticTableTop
           </h1>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
+            {user && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="h-4 w-4" />
+                <span>{user.username}</span>
+              </div>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -127,7 +194,13 @@ const Index = () => {
           </p>
         </div>
 
-        <div className="space-y-4">
+        <Tabs defaultValue="generate" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="generate">Generate New</TabsTrigger>
+            <TabsTrigger value="load">Load Campaign</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="generate" className="space-y-4 mt-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Campaign Outline</label>
             <Textarea
@@ -201,7 +274,52 @@ const Index = () => {
               "Generate Campaign"
             )}
           </Button>
-        </div>
+          </TabsContent>
+          
+          <TabsContent value="load" className="space-y-4 mt-4">
+            {loadingCampaigns ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-accent" />
+              </div>
+            ) : savedCampaigns.length === 0 ? (
+              <Card className="p-8 text-center">
+                <Scroll className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">No saved campaigns yet.</p>
+                <p className="text-sm text-muted-foreground mt-2">Generate a new campaign to get started!</p>
+              </Card>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {savedCampaigns.map((campaign) => (
+                  <Card key={campaign.id} className="p-4 hover:bg-accent/10 transition-colors">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-foreground">{campaign.title}</h3>
+                        <p className="text-sm text-muted-foreground mt-1">{campaign.theme}</p>
+                        <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                          {campaign.background}
+                        </p>
+                        {campaign.created_at && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Created: {new Date(campaign.created_at).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        onClick={() => handleLoadCampaign(campaign.id)}
+                        disabled={loading}
+                        size="sm"
+                        className="ml-4"
+                      >
+                        <Play className="h-4 w-4 mr-2" />
+                        Load
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
 
         <div className="border-t pt-6 space-y-2">
           <h3 className="font-semibold text-sm">What You'll Get:</h3>
