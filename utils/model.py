@@ -1,7 +1,11 @@
 import os
+from dotenv import load_dotenv
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
+
+# Load environment variables from .env file
+load_dotenv()
 
 # LLM Configuration
 # These settings control the connection and behavior of the Large Language Model API

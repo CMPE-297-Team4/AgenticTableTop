@@ -11,7 +11,7 @@ langgraph==0.6.8
 
 # Utilities (Commonly needed)
 numpy
-requests==2.32.1
+requests==2.32.3
 
 # API Framework (For web interface integration)
 fastapi==0.104.1
@@ -19,5 +19,13 @@ uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
 # Vector Database (For AI agent data storage)
-pinecone>=5.0.0,<7.0.0  # Compatible with Python 3.8-3.13 (package renamed from pinecone-client)
-openai>=1.12.0,<2.0.0  # For embeddings
+pinecone==6.0.0
+openai>=1.12.0  # For embeddings
+
+# Retrieval-Augmented Generation (RAG) Dependencies
+# Note: PyMuPDF requires Visual Studio build tools. Install separately if needed:
+# pip install PyMuPDF
+# Note: scikit-learn requires C compiler. Use numpy alternatives or install separately if needed:
+# pip install scikit-learn
+python-dotenv==1.0.0  # For environment variable management
+
