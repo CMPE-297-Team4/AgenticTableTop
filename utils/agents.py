@@ -1,9 +1,10 @@
 import re
 import time
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import yaml
 
-from utils.prompt import game_plan_prompt, quest_generation_prompt, storyteller_prompt
+from utils.prompt import game_plan_prompt, quest_generation_prompt, storyteller_prompt, monster_generation_prompt
 from utils.rag_prompts import (
     rag_game_plan_prompt,
     rag_quest_generation_prompt,
@@ -14,7 +15,9 @@ from utils.tools import (
     parse_acts_result,
     parse_quests_result,
     parse_storyteller_result,
+    parse_monster_result,
 )
+from utils.trajectory_logger import TrajectoryLogger
 
 with open("config.yaml", "r") as f:
     config = yaml.safe_load(f)
@@ -38,7 +41,12 @@ def background_story(model, state):
     content = response.content
 
     # Parse response
-    title, background_story, key_themes = parse_storyteller_result(content)
+    result = parse_storyteller_result(content)
+    if result is None:
+        print("ERROR: Failed to parse storyteller result. Please check the LLM response format.")
+        return False
+    
+    title, background_story, key_themes = result
     # Print response
     state["title"] = title
     state["background_story"] = background_story
@@ -364,4 +372,365 @@ def generate_quests_for_act_with_rag(
         f"Time taken for this request: {end_time - start_time} seconds, and tokens used: {get_total_tokens(response)}"
     )
     return True
+
+
+# ============================================================================
+# MONSTER GENERATION FUNCTIONS
+# ============================================================================
+
+
+def generate_monsters_for_combat_quests(model, state, trajectory_logger: Optional[TrajectoryLogger] = None):
+    """
+    Generate monsters for all combat quests in the campaign.
+    
+    This function:
+    1. Collects all quests with "combat" in their quest_type from all acts
+    2. Loops through each combat quest sequentially
+    3. Makes separate LLM calls for each quest with delays to avoid rate limiting
+    4. Implements retry logic (up to 3 attempts) with exponential backoff for failed requests
+    5. Continues processing even if some quests fail
+    
+    Args:
+        model: The LLM model instance
+        state: The game state containing quests (organized by act_title)
+        trajectory_logger: Optional trajectory logger for recording generation attempts
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    print("==================Generating monsters for combat quests==================")
+    start_time = time.time()
+    
+    # Initialize trajectory logger if not provided
+    if trajectory_logger is None:
+        trajectory_logger = TrajectoryLogger()
+        print(f"Trajectory log: {trajectory_logger.get_log_path()}")
+    
+    # Initialize monsters dict if it doesn't exist
+    if "monsters" not in state:
+        state["monsters"] = {}
+    
+    total_monsters = 0
+    combat_quests_found = 0
+    successful_generations = 0
+    failed_generations = 0
+    
+    # Check if quests exist
+    quests_dict = state.get("quests", {})
+    if not quests_dict:
+        print("WARNING: No quests found in state. Cannot generate monsters.")
+        return False
+    
+    print(f"Found {len(quests_dict)} act(s) with quests")
+    
+    # Collect all combat quests first
+    combat_quests = []
+    for act_title, quests in quests_dict.items():
+        print(f"\nChecking quests in: {act_title}")
+        for quest in quests:
+            quest_type = quest.get("quest_type", "").lower()
+            quest_name = quest.get("quest_name", "Unknown Quest")
+            print(f"  Quest: {quest_name} | Type: {quest.get('quest_type', 'Unknown')}")
+            
+            # Check if this is a combat quest (case-insensitive, handles formats like "Combat", "Combat/Ritual", etc.)
+            if "combat" in quest_type:
+                combat_quests_found += 1
+                combat_quests.append((quest_name, quest))
+    
+    print(f"\nFound {combat_quests_found} combat quest(s) to process")
+    
+    # Generate monsters for each combat quest with retry logic
+    for quest_index, (quest_name, quest) in enumerate(combat_quests, 1):
+        print(f"\n  ✓ Processing combat quest {quest_index}/{combat_quests_found}: {quest_name}")
+        print(f"    Generating monsters for: {quest_name}")
+        
+        # Add delay between requests to avoid rate limiting (except for first quest)
+        if quest_index > 1:
+            delay_seconds = 2.0  # 2 second delay between calls
+            print(f"    Waiting {delay_seconds} seconds to avoid rate limiting...")
+            time.sleep(delay_seconds)
+        
+        quest_start_time = time.time()
+        response_content = ""
+        error_msg = None
+        tokens_used = None
+        monsters = []
+        
+        # Retry logic for failed requests
+        max_retries = 3
+        retry_delay = 5.0  # Start with 5 seconds
+        retry_count = 0
+        success = False
+        
+        while retry_count < max_retries and not success:
+            try:
+                if retry_count > 0:
+                    print(f"    Retry attempt {retry_count}/{max_retries - 1} for {quest_name}")
+                    print(f"    Waiting {retry_delay} seconds before retry...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                
+                # Generate monsters for this combat quest
+                monsters, response_content, tokens_used = generate_monsters_for_quest(
+                    model, quest, return_response=True
+                )
+                
+                if monsters and len(monsters) > 0:
+                    state["monsters"][quest_name] = monsters
+                    total_monsters += len(monsters)
+                    successful_generations += 1
+                    success = True
+                    
+                    # Optionally: Add to monster registry for easy lookup
+                    # Uncomment if you want to use the registry:
+                    # from utils.schemas import MonsterRegistry, Monster
+                    # if "monster_registry" not in state:
+                    #     state["monster_registry"] = MonsterRegistry()
+                    # monster_objects = [Monster.model_validate(m) for m in monsters]
+                    # state["monster_registry"].add_monsters(quest_name, monster_objects)
+                    quest_end_time = time.time()
+                    
+                    # Log successful generation
+                    trajectory_logger.log_monster_generation(
+                        quest_name=quest_name,
+                        quest_data=quest,
+                        response_content=response_content,
+                        monsters=monsters,
+                        success=True,
+                        tokens_used=tokens_used,
+                        time_taken=quest_end_time - quest_start_time
+                    )
+                    print(f"    ✓ Successfully generated {len(monsters)} monster(s) for {quest_name}")
+                else:
+                    # Check if we got an empty response
+                    if not response_content or (isinstance(response_content, str) and not response_content.strip()):
+                        error_msg = f"Empty LLM response (retry {retry_count + 1}/{max_retries})"
+                        print(f"    ⚠ {error_msg}")
+                    else:
+                        error_msg = "No monsters returned from parser (response was not empty)"
+                        print(f"    ⚠ {error_msg}")
+                        print(f"    Response preview: {response_content[:200]}...")
+                    
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        # Final failure - log and continue
+                        failed_generations += 1
+                        quest_end_time = time.time()
+                        trajectory_logger.log_monster_generation(
+                            quest_name=quest_name,
+                            quest_data=quest,
+                            response_content=response_content or "Empty response after all retries",
+                            monsters=[],
+                            success=False,
+                            error=error_msg,
+                            tokens_used=tokens_used,
+                            time_taken=quest_end_time - quest_start_time
+                        )
+                        print(f"    ✗ Failed to generate monsters for {quest_name} after {max_retries} attempts")
+                    
+            except Exception as e:
+                error_msg = f"Exception: {str(e)} (retry {retry_count + 1}/{max_retries})"
+                print(f"    ⚠ {error_msg}")
+                retry_count += 1
+                
+                if retry_count >= max_retries:
+                    # Final failure - log and continue
+                    failed_generations += 1
+                    quest_end_time = time.time()
+                    trajectory_logger.log_monster_generation(
+                        quest_name=quest_name,
+                        quest_data=quest,
+                        response_content=response_content or f"Exception occurred: {str(e)}",
+                        monsters=[],
+                        success=False,
+                        error=error_msg,
+                        tokens_used=tokens_used,
+                        time_taken=quest_end_time - quest_start_time
+                    )
+                    print(f"    ✗ Exception generating monsters for {quest_name}: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+    
+    if combat_quests_found == 0:
+        print("\nWARNING: No combat quests found in the campaign!")
+        print("Make sure quests have 'combat' in their quest_type (e.g., 'Combat (Main)', 'Combat/Ritual')")
+    else:
+        print(f"\n{'='*60}")
+        print(f"Monster Generation Summary:")
+        print(f"  Total Combat Quests: {combat_quests_found}")
+        print(f"  Successful: {successful_generations}")
+        print(f"  Failed: {failed_generations}")
+        print(f"  Total Monsters Generated: {total_monsters}")
+        print(f"{'='*60}")
+        
+        # Log final summary
+        trajectory_logger.log_campaign_summary(
+            campaign_title=state.get("title", "Unknown Campaign"),
+            total_acts=len(state.get("acts", [])),
+            total_quests=sum(len(quests) for quests in quests_dict.values()),
+            total_monsters=total_monsters,
+            monsters_by_quest=state.get("monsters", {})
+        )
+        
+        print(f"\nTrajectory log saved to: {trajectory_logger.get_log_path()}")
+    
+    end_time = time.time()
+    print(f"Time taken for monster generation: {end_time - start_time:.2f} seconds")
+    return True
+
+
+def generate_monsters_for_quest(
+    model, quest: Dict[str, Any], quest_context: Optional[str] = None, return_response: bool = False
+) -> Union[List[Dict[str, Any]], Tuple[List[Dict[str, Any]], str, int]]:
+    """
+    Generate monsters for a specific combat quest.
+    
+    Args:
+        model: The LLM model instance
+        quest: Quest dictionary containing quest details
+        quest_context: Optional additional context about the quest
+        return_response: If True, return response content and tokens used
+        
+    Returns:
+        If return_response=False: List of monster dictionaries with stat blocks
+        If return_response=True: Tuple of (monsters, response_content, tokens_used)
+    """
+    print(f"==================Generating monsters for {quest.get('quest_name', 'Unknown Quest')}==================")
+    start_time = time.time()
+    
+    # Extract quest details
+    quest_name = quest.get("quest_name", "Unknown Quest")
+    quest_description = quest.get("description", "")
+    quest_type = quest.get("quest_type", "")
+    difficulty = quest.get("difficulty", "Medium")
+    locations = ", ".join(quest.get("locations", []))
+    objectives = ", ".join(quest.get("objectives", []))
+    
+    # Build prompt
+    prompt = monster_generation_prompt
+    prompt = re.sub(r"<quest_name>", quest_name, prompt)
+    prompt = re.sub(r"<quest_description>", quest_description, prompt)
+    prompt = re.sub(r"<quest_type>", quest_type, prompt)
+    prompt = re.sub(r"<difficulty>", difficulty, prompt)
+    prompt = re.sub(r"<locations>", locations, prompt)
+    prompt = re.sub(r"<objectives>", objectives, prompt)
+    
+    # Add quest context if provided
+    if quest_context:
+        prompt += f"\n\n# Additional Context\n{quest_context}"
+    
+    # Make LLM request with error handling
+    try:
+        print(f"    Making LLM request for {quest_name}...")
+        print(f"    Prompt length: {len(prompt)} characters")
+        response = model.invoke(prompt)
+        print(f"    ✓ LLM request completed")
+    except Exception as e:
+        print(f"    ✗ LLM request failed: {str(e)}")
+        print(f"    Exception type: {type(e).__name__}")
+        raise
+    
+    # Handle different response formats (OpenAI vs Gemini)
+    if hasattr(response, 'content'):
+        content = response.content
+    elif hasattr(response, 'text'):
+        content = response.text
+    elif isinstance(response, str):
+        content = response
+    elif hasattr(response, 'message') and hasattr(response.message, 'content'):
+        content = response.message.content
+    else:
+        # Try to get content from various possible attributes
+        content = getattr(response, 'content', None) or getattr(response, 'text', None) or str(response)
+    
+    # Ensure content is a string
+    if content is not None and not isinstance(content, str):
+        content = str(content)
+    
+    # Debug: Log response type and structure if empty
+    if not content or (isinstance(content, str) and not content.strip()):
+        print(f"WARNING: Empty response content for quest: {quest_name}")
+        print(f"Response type: {type(response)}")
+        print(f"Response attributes: {[attr for attr in dir(response) if not attr.startswith('_')]}")
+        if hasattr(response, '__dict__'):
+            print(f"Response dict keys: {list(response.__dict__.keys())}")
+        # Try alternative access methods for LangChain responses
+        if hasattr(response, 'messages') and response.messages:
+            try:
+                content = response.messages[0].content if hasattr(response.messages[0], 'content') else str(response.messages[0])
+            except:
+                pass
+        elif hasattr(response, 'choices') and response.choices:
+            try:
+                content = response.choices[0].message.content if hasattr(response.choices[0].message, 'content') else str(response.choices[0])
+            except:
+                pass
+        # Last resort: try to convert entire response to string
+        if not content or (isinstance(content, str) and not content.strip()):
+            content = str(response)
+            print(f"Using string representation of response: {content[:200]}...")
+    
+    tokens_used = get_total_tokens(response)
+    
+    # Parse the monsters from the response
+    monsters = parse_monster_result(content)
+    
+    # Print monster summaries
+    if monsters:
+        print(f"\nGenerated {len(monsters)} monsters:")
+        for i, monster in enumerate(monsters, 1):
+            print(f"\n  Monster {i}: {monster.get('name', 'Unnamed Monster')}")
+            print(f"    Type: {monster.get('type', 'Unknown')} {monster.get('size', 'Unknown')}")
+            print(f"    CR: {monster.get('challenge_rating', 'Unknown')}")
+            print(f"    HP: {monster.get('hit_points', 0)}")
+            print(f"    AC: {monster.get('armor_class', 0)}")
+            description = monster.get("description", "No description available")
+            print(f"    Description: {description}")
+    else:
+        print(f"\nWARNING: No monsters generated for {quest_name}")
+    
+    end_time = time.time()
+    print(
+        f"Time taken for this request: {end_time - start_time:.2f} seconds, and tokens used: {tokens_used}"
+    )
+    
+    if return_response:
+        return monsters, content, tokens_used
+    else:
+        return monsters
+
+
+def generate_encounter_for_act(
+    model, act: Dict[str, Any], party_level: int = 3, party_size: int = 4
+) -> List[Dict[str, Any]]:
+    """
+    Generate a balanced encounter for an entire act.
+    
+    Args:
+        model: The LLM model instance
+        act: Act dictionary containing act details
+        party_level: Average party level for balancing
+        party_size: Number of party members
+        
+    Returns:
+        List of encounter dictionaries with monsters
+    """
+    print(f"==================Generating encounter for {act.get('act_title', 'Unknown Act')}==================")
+    
+    # Find combat quests in this act
+    combat_quests = []
+    # This would need to be integrated with the quest system
+    # For now, we'll generate a sample encounter
+    
+    # Generate a boss monster for the act
+    boss_quest = {
+        "quest_name": f"{act.get('act_title', 'Act')} - Final Confrontation",
+        "description": f"Face the primary threat of {act.get('act_title', 'this act')}",
+        "quest_type": "Combat (Main)",
+        "difficulty": "Hard" if party_level >= 5 else "Medium",
+        "locations": act.get("key_locations", []),
+        "objectives": [f"Defeat the {act.get('primary_conflict', 'primary threat')}"]
+    }
+    
+    return generate_monsters_for_quest(model, boss_quest)
 
