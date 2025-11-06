@@ -12,3 +12,44 @@ QuestGeneratorOutline: "I want a quest for a new Dungeons & Dragons campaign."
 # Character Generator Outline
 ##########################
 CharacterGeneratorOutline: "I want a character for a new Dungeons & Dragons campaign."
+
+##########################
+# Retrieval-Augmented Generation (RAG) Configuration
+##########################
+RAG:
+  # Enable/disable RAG for all generation tasks
+  enabled: false
+  
+  # Pinecone Configuration
+  pinecone:
+    # Index name for storing campaign knowledge
+    index_name: "agentic-tabletop"
+    # Cloud region (aws, gcp, azure)
+    region: "us-east-1"
+    cloud: "aws"
+  
+  # Knowledge Base Configuration
+  knowledge_base:
+    # Namespace for campaign rules and lore
+    rules_namespace: "campaign-rules"
+    # Namespace for campaign setting/world
+    setting_namespace: "campaign-setting"
+    # Namespace for NPC and character information
+    character_namespace: "campaign-characters"
+    
+  # Retrieval Configuration
+  retrieval:
+    # Number of top matches to retrieve per query
+    top_k: 3
+    # Maximum characters to include in context
+    max_context_chars: 8000
+    # Embedding model to use
+    embed_model: "text-embedding-3-small"
+  
+  # PDF Processing Configuration
+  pdf_processing:
+    # Chunk size (lines per chunk)
+    chunk_size: 5
+    # Stride/overlap between chunks
+    stride: 2
+
