@@ -1,5 +1,6 @@
 # Core Dependencies (Currently Used)
 pydantic==2.11.1
+email-validator>=2.0.0  # Email validation for Pydantic EmailStr
 PyYAML
 
 # LLM Providers (Currently Used)
@@ -19,8 +20,8 @@ uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
 # Vector Database (For AI agent data storage)
-pinecone==6.0.0
-openai>=1.12.0  # For embeddings
+pinecone>=5.0.0,<6.0.0  # Compatible with Python 3.8-3.13 (v6.0.0 has breaking changes)
+openai>=1.12.0,<2.0.0  # For embeddings
 
 # Retrieval-Augmented Generation (RAG) Dependencies
 # Note: PyMuPDF requires Visual Studio build tools. Install separately if needed:
@@ -28,4 +29,9 @@ openai>=1.12.0  # For embeddings
 # Note: scikit-learn requires C compiler. Use numpy alternatives or install separately if needed:
 # pip install scikit-learn
 python-dotenv==1.0.0  # For environment variable management
+
+# Database (For user authentication and image storage)
+sqlalchemy>=2.0.0,<3.0.0  # ORM for database operations
+passlib[bcrypt]>=1.7.4,<2.0.0  # Password hashing with bcrypt
+python-jose[cryptography]>=3.3.0,<4.0.0  # JWT token generation
 

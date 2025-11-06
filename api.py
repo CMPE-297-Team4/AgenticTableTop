@@ -8,9 +8,11 @@ import traceback
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from pydantic import BaseModel, EmailStr
+from sqlalchemy.orm import Session
 
 # Load environment variables from .env file
 load_dotenv()
@@ -27,9 +29,22 @@ from utils.llm_cache import (
 from utils.model import initialize_llm
 from utils.state import GameStatus
 from utils.pinecone_service import pinecone_service
+from utils.database import Campaign, NPCImage, SessionLocal, User, get_db, init_db
+from utils.auth import (
+    create_access_token,
+    decode_access_token,
+    get_password_hash,
+    verify_password,
+)
 
 # Constants
 DEFAULT_CAMPAIGN_TITLE = "Untitled Campaign"
+
+# OAuth2 scheme for token authentication
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login", auto_error=False)
+
+# Initialize database on startup
+init_db()
 
 app = FastAPI(
     title="AgenticTableTop API",
@@ -55,6 +70,7 @@ class CampaignRequest(BaseModel):
     save_to_pinecone: Optional[bool] = False  # Whether to save to Pinecone
     user_id: Optional[str] = None  # User ID for Pinecone storage
     tags: Optional[List[str]] = []  # Tags for Pinecone storage
+    force_new: Optional[bool] = False  # Force new generation, bypass cache
 
 
 class CampaignResponse(BaseModel):
@@ -104,6 +120,40 @@ class NPCImageRequest(BaseModel):
     npc_name: str
     npc_description: str  # race, class, background, role
     quest_context: Optional[str] = None  # additional context
+    campaign_id: Optional[str] = None  # optional - link to campaign
+
+
+class UserRegister(BaseModel):
+    """Request model for user registration"""
+
+    username: str
+    email: EmailStr
+    password: str
+
+
+class UserLogin(BaseModel):
+    """Request model for user login"""
+
+    username: str
+    password: str
+
+
+class Token(BaseModel):
+    """Response model for authentication token"""
+
+    access_token: str
+    token_type: str = "bearer"
+    user_id: int
+    username: str
+
+
+class UserResponse(BaseModel):
+    """Response model for user information"""
+
+    id: int
+    username: str
+    email: str
+    is_active: bool
 
 
 class NPCImageResponse(BaseModel):
@@ -120,10 +170,151 @@ async def root():
     return {"message": "Welcome to AgenticTableTop API", "docs": "/docs", "health": "/health"}
 
 
+# Authentication helper functions
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+) -> User:
+    """Get current authenticated user from JWT token"""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    payload = decode_access_token(token)
+    if payload is None:
+        raise credentials_exception
+    
+    user_id_str: str = payload.get("sub")
+    if user_id_str is None:
+        raise credentials_exception
+    
+    # Convert string user_id to int
+    try:
+        user_id: int = int(user_id_str)
+    except (ValueError, TypeError):
+        raise credentials_exception
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise credentials_exception
+    
+    return user
+
+
+def get_current_user_optional(
+    token: Optional[str] = Depends(oauth2_scheme), db: Session = Depends(get_db)
+) -> Optional[User]:
+    """Get current user if authenticated, otherwise return None"""
+    if token is None:
+        return None
+    try:
+        payload = decode_access_token(token)
+        if payload is None:
+            return None
+        
+        user_id_str: str = payload.get("sub")
+        if user_id_str is None:
+            return None
+        
+        # Convert string user_id to int
+        try:
+            user_id: int = int(user_id_str)
+        except (ValueError, TypeError):
+            return None
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        return user
+    except Exception:
+        return None
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
     return {"status": "ok", "service": "AgenticTableTop API", "version": "1.0.0"}
+
+
+@app.post("/api/auth/register", response_model=UserResponse)
+async def register(user_data: UserRegister, db: Session = Depends(get_db)):
+    """Register a new user"""
+    # Check if username already exists
+    existing_user = db.query(User).filter(User.username == user_data.username).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered",
+        )
+    
+    # Check if email already exists
+    existing_email = db.query(User).filter(User.email == user_data.email).first()
+    if existing_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
+        )
+    
+    # Create new user
+    hashed_password = get_password_hash(user_data.password)
+    new_user = User(
+        username=user_data.username,
+        email=user_data.email,
+        hashed_password=hashed_password,
+    )
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    return UserResponse(
+        id=new_user.id,
+        username=new_user.username,
+        email=new_user.email,
+        is_active=new_user.is_active,
+    )
+
+
+@app.post("/api/auth/login", response_model=Token)
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
+):
+    """Login and get access token"""
+    # Find user by username
+    user = db.query(User).filter(User.username == form_data.username).first()
+    
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+    
+    # Create access token (sub must be a string)
+    access_token = create_access_token(data={"sub": str(user.id)})
+    
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        user_id=user.id,
+        username=user.username,
+    )
+
+
+@app.get("/api/auth/me", response_model=UserResponse)
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """Get current user information"""
+    return UserResponse(
+        id=current_user.id,
+        username=current_user.username,
+        email=current_user.email,
+        is_active=current_user.is_active,
+    )
 
 
 @app.get("/api/cache/stats")
@@ -169,7 +360,12 @@ async def cleanup_cache():
 
 
 @app.post("/api/generate-campaign", response_model=CampaignResponse)
-async def generate_campaign(request: CampaignRequest):
+async def generate_campaign(
+    request: CampaignRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
     Generate a complete D&D campaign with background story, acts, and quests
 
@@ -185,13 +381,15 @@ async def generate_campaign(request: CampaignRequest):
         cache_enabled = os.environ.get("LLM_CACHE_ENABLED", "true").lower() == "true"
 
         # Create cache key from request
-        cache_key = f"campaign:{request.outline}:{request.model_type}"
+        # Include user_id in cache key so each user has their own cache
+        user_id_str = str(current_user.id) if current_user else "anonymous"
+        cache_key = f"campaign:{user_id_str}:{request.outline}:{request.model_type}"
 
-        # Try to get cached response
-        if cache_enabled:
+        # Try to get cached response (only if not forcing new generation)
+        if cache_enabled and not request.force_new:
             cached_response = get_cached_response(cache_key, "campaign")
             if cached_response:
-                print(f"Returning cached campaign for: {request.outline[:50]}...")
+                print(f"Returning cached campaign for user {user_id_str}: {request.outline[:50]}...")
                 return CampaignResponse(**cached_response)
 
         print(f"Generating new campaign for: {request.outline[:50]}...")
@@ -266,24 +464,169 @@ async def generate_campaign(request: CampaignRequest):
             cache_response(cache_key, campaign_response.dict(), "campaign")
             print(f"Cached campaign response for: {request.outline[:50]}...")
         
-        # Save to Pinecone if requested
+        # Generate campaign ID (use Pinecone ID if saved, otherwise generate UUID)
+        campaign_id = None
+        
+        # Always save to database for user
+        import json
+        campaign_db = Campaign(
+            user_id=current_user.id,
+            title=campaign_response.title,
+            background=campaign_response.background,
+            theme=campaign_response.theme,
+            campaign_data=json.dumps(campaign_response.dict())
+        )
+        db.add(campaign_db)
+        db.commit()
+        db.refresh(campaign_db)
+        campaign_id = str(campaign_db.id)
+        print(f"Campaign saved to database with ID: {campaign_id}")
+        
+        # Optionally save to Pinecone if requested
         if request.save_to_pinecone:
             try:
-                campaign_id = pinecone_service.store_campaign(
+                pinecone_id = pinecone_service.store_campaign(
                     campaign_data=campaign_response.dict(),
-                    user_id=request.user_id,
+                    user_id=request.user_id or str(current_user.id),
                     tags=request.tags or []
                 )
-                print(f"Campaign saved to Pinecone with ID: {campaign_id}")
+                print(f"Campaign also saved to Pinecone with ID: {pinecone_id}")
             except Exception as e:
                 print(f"Warning: Failed to save campaign to Pinecone: {e}")
                 # Don't fail the request if Pinecone save fails
+        
+        # Use database campaign_id for image storage
+        campaign_id = str(campaign_db.id)
+        
+        # Automatically generate NPC images in the background
+        # Extract all unique NPC names from quests
+        all_npcs = set()
+        for quest_list in transformed_quests.values():
+            for quest in quest_list:
+                npcs = quest.get("npcs", [])
+                for npc in npcs:
+                    # Clean NPC name (remove parenthetical descriptions)
+                    npc_name = npc.split("(")[0].strip() if "(" in npc else npc.strip()
+                    if npc_name:
+                        all_npcs.add(npc_name)
+        
+        # Generate images for all NPCs in background (don't block response)
+        if all_npcs:
+            print(f"🎨 Auto-generating images for {len(all_npcs)} NPCs: {', '.join(list(all_npcs)[:5])}{'...' if len(all_npcs) > 5 else ''}")
+            
+            # Add background task to generate NPC images
+            background_tasks.add_task(
+                generate_npc_images_sync,
+                npc_names=list(all_npcs),
+                campaign_id=campaign_id,
+                campaign_data=campaign_response.dict(),
+                user_id=current_user.id if current_user else None
+            )
         
         return campaign_response
     except Exception as e:
         print(f"Error generating campaign: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to generate campaign: {str(e)}")
+
+
+def generate_npc_images_sync(
+    npc_names: List[str],
+    campaign_id: str,
+    campaign_data: Dict[str, Any],
+    user_id: Optional[int],
+):
+    """
+    Synchronously generate images for NPCs found in the campaign.
+    This runs as a background task and doesn't block the campaign generation response.
+    """
+    try:
+        from utils.character_generator import generate_npc_portrait
+        from utils.database import SessionLocal
+        
+        # Create a new database session for background task
+        db = SessionLocal()
+        
+        try:
+            # Extract NPC descriptions from campaign data if available
+            npc_descriptions = {}
+            for quest_list in campaign_data.get("quests", {}).values():
+                for quest in quest_list:
+                    quest_npcs = quest.get("npcs", [])
+                    for npc_entry in quest_npcs:
+                        # Parse "Name (description)" format
+                        if "(" in npc_entry and ")" in npc_entry:
+                            name = npc_entry.split("(")[0].strip()
+                            desc = npc_entry.split("(")[1].split(")")[0].strip()
+                            npc_descriptions[name] = desc
+                        else:
+                            name = npc_entry.strip()
+                            if name and name not in npc_descriptions:
+                                npc_descriptions[name] = "A character from the campaign"
+            
+            # Generate images for each NPC
+            for npc_name in npc_names:
+                try:
+                    # Check if image already exists in database
+                    existing = db.query(NPCImage).filter(
+                        NPCImage.npc_name == npc_name,
+                        NPCImage.campaign_id == campaign_id
+                    ).first()
+                    
+                    if existing:
+                        print(f"  ✓ Image already exists for {npc_name}")
+                        continue
+                    
+                    # Get description or use default
+                    npc_description = npc_descriptions.get(
+                        npc_name,
+                        f"A character named {npc_name} from the campaign"
+                    )
+                    
+                    # Generate image
+                    print(f"  🎨 Generating image for {npc_name}...")
+                    result = generate_npc_portrait(
+                        npc_name=npc_name,
+                        npc_description=npc_description,
+                        quest_context=f"Character from campaign: {campaign_data.get('title', 'Untitled')}"
+                    )
+                    
+                    if "error" in result:
+                        print(f"  ⚠️  Failed to generate image for {npc_name}: {result['error']}")
+                        continue
+                    
+                    # Save to database
+                    new_image = NPCImage(
+                        user_id=user_id,
+                        campaign_id=campaign_id,
+                        npc_name=npc_name,
+                        npc_description=npc_description,
+                        quest_context=f"Auto-generated for campaign: {campaign_data.get('title', 'Untitled')}",
+                        image_base64=result["image_base64"],
+                        prompt_used=result.get("prompt_used", ""),
+                    )
+                    db.add(new_image)
+                    db.commit()
+                    print(f"  ✅ Saved image for {npc_name} (ID: {new_image.id})")
+                    
+                    # Small delay to avoid rate limiting
+                    import time
+                    time.sleep(0.5)
+                    
+                except Exception as e:
+                    print(f"  ⚠️  Error generating image for {npc_name}: {str(e)}")
+                    db.rollback()
+                    continue
+            
+            print(f"🎨 Finished auto-generating NPC images for campaign {campaign_id}")
+            
+        finally:
+            db.close()
+        
+    except Exception as e:
+        print(f"⚠️  Error in background NPC image generation: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 
 @app.post("/api/generate-story", response_model=StoryResponse)
@@ -402,17 +745,44 @@ async def generate_game_plan_only(request: CampaignRequest):
 
 
 @app.post("/api/save-campaign")
-async def save_campaign(request: SaveCampaignRequest):
+async def save_campaign(
+    request: SaveCampaignRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
-    Save a generated campaign to Pinecone vector database
+    Save a generated campaign to database and optionally Pinecone
     
-    This endpoint stores the campaign data for future retrieval and similarity search
+    This endpoint stores the campaign data for future retrieval
     """
     try:
-        campaign_id = pinecone_service.store_campaign(
-            campaign_data=request.campaign_data.dict(),
-            user_id=request.user_id
+        import json
+        
+        # Save to database
+        campaign_db = Campaign(
+            user_id=current_user.id,
+            title=request.campaign_data.title,
+            background=request.campaign_data.background,
+            theme=request.campaign_data.theme,
+            campaign_data=json.dumps(request.campaign_data.dict())
         )
+        db.add(campaign_db)
+        db.commit()
+        db.refresh(campaign_db)
+        
+        campaign_id = str(campaign_db.id)
+        
+        # Optionally save to Pinecone if requested
+        if request.user_id or request.tags:
+            try:
+                pinecone_id = pinecone_service.store_campaign(
+                    campaign_data=request.campaign_data.dict(),
+                    user_id=request.user_id or str(current_user.id),
+                    tags=request.tags or []
+                )
+                print(f"Campaign also saved to Pinecone with ID: {pinecone_id}")
+            except Exception as e:
+                print(f"Warning: Failed to save to Pinecone: {e}")
         
         return {
             "success": True,
@@ -423,6 +793,71 @@ async def save_campaign(request: SaveCampaignRequest):
         print(f"Error saving campaign: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to save campaign: {str(e)}")
+
+
+@app.get("/api/user/campaigns", response_model=List[Dict[str, Any]])
+async def list_user_campaigns(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    List all campaigns for the current user
+    """
+    try:
+        campaigns = db.query(Campaign).filter(
+            Campaign.user_id == current_user.id
+        ).order_by(Campaign.created_at.desc()).all()
+        
+        return [
+            {
+                "id": camp.id,
+                "title": camp.title,
+                "theme": camp.theme,
+                "background": camp.background[:200] + "..." if camp.background and len(camp.background) > 200 else camp.background,
+                "created_at": camp.created_at.isoformat() if camp.created_at else None,
+                "updated_at": camp.updated_at.isoformat() if camp.updated_at else None,
+            }
+            for camp in campaigns
+        ]
+    except Exception as e:
+        print(f"Error listing campaigns: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to list campaigns: {str(e)}")
+
+
+@app.get("/api/user/campaigns/{campaign_id}")
+async def get_user_campaign(
+    campaign_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get a specific campaign by ID (only if owned by user)
+    """
+    try:
+        import json
+        
+        campaign = db.query(Campaign).filter(
+            Campaign.id == campaign_id,
+            Campaign.user_id == current_user.id
+        ).first()
+        
+        if not campaign:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Campaign not found"
+            )
+        
+        # Parse campaign data
+        campaign_data = json.loads(campaign.campaign_data) if campaign.campaign_data else {}
+        
+        return campaign_data
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error retrieving campaign: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve campaign: {str(e)}")
 
 
 @app.post("/api/search-campaigns", response_model=SearchResponse)
@@ -518,23 +953,48 @@ async def delete_campaign(campaign_id: str):
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to delete campaign: {str(e)}")
 @app.post("/api/generate-npc-image", response_model=NPCImageResponse)
-async def generate_npc_image(request: NPCImageRequest):
+async def generate_npc_image(
+    request: NPCImageRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
     """
     Generate a portrait image for an NPC using OpenAI's image generation API
 
     This endpoint:
-    1. Takes NPC name and description
-    2. Generates a portrait prompt using GPT
-    3. Creates an image using DALL-E 3
-    4. Returns base64-encoded image
+    1. Checks database for existing image (by NPC name and description)
+    2. If found, returns stored image
+    3. If not found, generates new image using DALL-E 3
+    4. Saves new image to database
+    5. Returns base64-encoded image
 
     Useful for DMs who want visual representations of NPCs in their campaigns
     """
     try:
-        # Check if caching is enabled
+        # First, check database for existing image
+        query = db.query(NPCImage).filter(NPCImage.npc_name == request.npc_name)
+        
+        # If user is authenticated, prefer their images
+        if current_user:
+            query = query.filter(NPCImage.user_id == current_user.id)
+        
+        # If campaign_id provided, filter by it
+        if request.campaign_id:
+            query = query.filter(NPCImage.campaign_id == request.campaign_id)
+        
+        # Try to find matching image (by name and similar description)
+        existing_image = query.first()
+        
+        if existing_image:
+            print(f"Returning stored NPC image from database for: {request.npc_name}")
+            return NPCImageResponse(
+                npc_name=existing_image.npc_name,
+                image_base64=existing_image.image_base64,
+                prompt_used=existing_image.prompt_used or "",
+            )
+        
+        # Check if caching is enabled (fallback to LLM cache)
         cache_enabled = os.environ.get("LLM_CACHE_ENABLED", "true").lower() == "true"
-
-        # Create cache key from request
         cache_key = (
             f"npc_image:{request.npc_name}:{request.npc_description}:{request.quest_context or ''}"
         )
@@ -544,6 +1004,18 @@ async def generate_npc_image(request: NPCImageRequest):
             cached_response = get_cached_response(cache_key, "npc_image")
             if cached_response:
                 print(f"Returning cached NPC image for: {request.npc_name}")
+                # Save cached image to database for future use
+                new_image = NPCImage(
+                    user_id=current_user.id if current_user else None,
+                    campaign_id=request.campaign_id,
+                    npc_name=request.npc_name,
+                    npc_description=request.npc_description,
+                    quest_context=request.quest_context,
+                    image_base64=cached_response["image_base64"],
+                    prompt_used=cached_response.get("prompt_used", ""),
+                )
+                db.add(new_image)
+                db.commit()
                 return NPCImageResponse(**cached_response)
 
         print(f"Generating new NPC image for: {request.npc_name}")
@@ -557,24 +1029,173 @@ async def generate_npc_image(request: NPCImageRequest):
         if "error" in result:
             raise HTTPException(status_code=500, detail=result["error"])
 
-        # Create response
-        response_data = {
-            "npc_name": result["npc_name"],
-            "image_base64": result["image_base64"],
-            "prompt_used": result["prompt_used"],
-        }
+        # Save to database
+        new_image = NPCImage(
+            user_id=current_user.id if current_user else None,
+            campaign_id=request.campaign_id,
+            npc_name=result["npc_name"],
+            npc_description=request.npc_description,
+            quest_context=request.quest_context,
+            image_base64=result["image_base64"],
+            prompt_used=result.get("prompt_used", ""),
+        )
+        db.add(new_image)
+        db.commit()
+        db.refresh(new_image)
+        
+        print(f"Saved NPC image to database (ID: {new_image.id})")
 
         # Cache the response if caching is enabled
         if cache_enabled:
-            cache_response(cache_key, response_data, "npc_image")
-            print(f"Cached NPC image response for: {request.npc_name}")
+            cache_response(cache_key, {
+                "npc_name": result["npc_name"],
+                "image_base64": result["image_base64"],
+                "prompt_used": result.get("prompt_used", ""),
+            }, "npc_image")
 
-        return NPCImageResponse(**response_data)
+        return NPCImageResponse(
+            npc_name=result["npc_name"],
+            image_base64=result["image_base64"],
+            prompt_used=result.get("prompt_used", ""),
+        )
 
     except Exception as e:
         print(f"Error generating NPC image: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to generate NPC image: {str(e)}")
+
+
+@app.get("/api/npc-images", response_model=List[Dict[str, Any]])
+async def list_npc_images(
+    campaign_id: Optional[str] = None,
+    npc_name: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    """
+    List NPC images from database
+    
+    Returns stored NPC images filtered by:
+    - campaign_id (optional)
+    - npc_name (optional)
+    - user_id (if authenticated)
+    """
+    try:
+        query = db.query(NPCImage)
+        
+        # Filter by user if authenticated
+        if current_user:
+            query = query.filter(NPCImage.user_id == current_user.id)
+        
+        # Filter by campaign if provided
+        if campaign_id:
+            query = query.filter(NPCImage.campaign_id == campaign_id)
+        
+        # Filter by NPC name if provided
+        if npc_name:
+            query = query.filter(NPCImage.npc_name.ilike(f"%{npc_name}%"))
+        
+        images = query.order_by(NPCImage.created_at.desc()).all()
+        
+        return [
+            {
+                "id": img.id,
+                "npc_name": img.npc_name,
+                "npc_description": img.npc_description,
+                "quest_context": img.quest_context,
+                "campaign_id": img.campaign_id,
+                "created_at": img.created_at.isoformat() if img.created_at else None,
+                "has_image": bool(img.image_base64),
+            }
+            for img in images
+        ]
+    except Exception as e:
+        print(f"Error listing NPC images: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to list NPC images: {str(e)}")
+
+
+@app.get("/api/npc-images/{npc_name}", response_model=NPCImageResponse)
+async def get_npc_image(
+    npc_name: str,
+    campaign_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    """
+    Get a specific NPC image by name
+    
+    Returns the stored image if found in database
+    """
+    try:
+        query = db.query(NPCImage).filter(NPCImage.npc_name == npc_name)
+        
+        # If user is authenticated, prefer their images
+        if current_user:
+            query = query.filter(NPCImage.user_id == current_user.id)
+        
+        # If campaign_id provided, filter by it
+        if campaign_id:
+            query = query.filter(NPCImage.campaign_id == campaign_id)
+        
+        image = query.first()
+        
+        if not image:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"NPC image not found for: {npc_name}",
+            )
+        
+        return NPCImageResponse(
+            npc_name=image.npc_name,
+            image_base64=image.image_base64,
+            prompt_used=image.prompt_used or "",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error retrieving NPC image: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve NPC image: {str(e)}")
+
+
+@app.delete("/api/npc-images/{image_id}")
+async def delete_npc_image(
+    image_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Delete an NPC image
+    
+    Only the owner can delete their images
+    """
+    try:
+        image = db.query(NPCImage).filter(NPCImage.id == image_id).first()
+        
+        if not image:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="NPC image not found",
+            )
+        
+        # Check if user owns this image
+        if image.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to delete this image",
+            )
+        
+        db.delete(image)
+        db.commit()
+        
+        return {"success": True, "message": "NPC image deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error deleting NPC image: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to delete NPC image: {str(e)}")
 
 
 if __name__ == "__main__":
