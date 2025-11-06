@@ -16,8 +16,19 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 
 from openai import OpenAI
-from pinecone import Pinecone, ServerlessSpec
+from pinecone import Pinecone
 from pydantic import BaseModel
+
+# Try to import ServerlessSpec for v5.x compatibility
+try:
+    from pinecone import ServerlessSpec
+except ImportError:
+    # For Pinecone v5.x, ServerlessSpec is in a different location or not needed
+    try:
+        from pinecone.grpc import ServerlessSpec
+    except ImportError:
+        # Fallback: ServerlessSpec might not be needed in v5.x
+        ServerlessSpec = None
 
 # Configuration
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -119,18 +130,38 @@ class PineconeService:
             return
         
         try:
-            # Check if index exists
-            if PINECONE_INDEX_NAME not in pc.list_indexes().names():
-                # Create index if it doesn't exist
-                pc.create_index(
-                    name=PINECONE_INDEX_NAME,
-                    dimension=1536,  # OpenAI embedding dimension
-                    metric="cosine",
-                    spec=ServerlessSpec(
+            # Check if index exists (compatible with both v3.x and v5.x)
+            index_list = pc.list_indexes()
+            index_names = []
+            
+            # Handle different return types from list_indexes()
+            if hasattr(index_list, 'names'):
+                index_names = index_list.names()
+            elif isinstance(index_list, list):
+                index_names = [idx.name if hasattr(idx, 'name') else str(idx) for idx in index_list]
+            elif hasattr(index_list, '__iter__'):
+                index_names = [idx.name if hasattr(idx, 'name') else str(idx) for idx in index_list]
+            
+            if PINECONE_INDEX_NAME not in index_names:
+                # Create index if it doesn't exist (compatible with both v3.x and v5.x)
+                create_params = {
+                    "name": PINECONE_INDEX_NAME,
+                    "dimension": 1536,  # OpenAI embedding dimension
+                    "metric": "cosine",
+                }
+                
+                # Add ServerlessSpec if available (v3.x style)
+                if ServerlessSpec is not None:
+                    create_params["spec"] = ServerlessSpec(
                         cloud="aws",
                         region=PINECONE_ENVIRONMENT
                     )
-                )
+                else:
+                    # For v5.x, might use different parameters
+                    create_params["cloud"] = "aws"
+                    create_params["region"] = PINECONE_ENVIRONMENT
+                
+                pc.create_index(**create_params)
                 print(f"Created Pinecone index: {PINECONE_INDEX_NAME}")
             
             self.index = pc.Index(PINECONE_INDEX_NAME)
@@ -138,6 +169,8 @@ class PineconeService:
             
         except Exception as e:
             print(f"Error initializing Pinecone: {e}")
+            import traceback
+            traceback.print_exc()
             self.index = None
     
     def _get_embedding(self, text: str) -> List[float]:

@@ -16,7 +16,8 @@ fi
 
 # Install Python dependencies
 echo "📦 Installing Python dependencies..."
-pip install pinecone-client==3.0.0 openai==1.12.0
+$PY -m pip install --upgrade pip setuptools wheel certifi >/dev/null 2>&1 || true
+$PY -m pip install "pinecone>=5.0.0,<7.0.0" "openai>=1.12.0,<2.0.0" >/dev/null 2>&1 || true
 
 # Check if required environment variables are set
 echo "🔍 Checking environment variables..."
@@ -36,7 +37,15 @@ if [ -z "$OPENAI_API_KEY" ]; then
     echo "   Get your API key from: https://platform.openai.com/api-keys"
 fi
 
-# Test Pinecone connection
+# Load .env into current shell (if present)
+if [ -f ".env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
+# Test Pinecone connection (with selected interpreter)
 echo "🧪 Testing Pinecone connection..."
 python3 -c "
 import os
