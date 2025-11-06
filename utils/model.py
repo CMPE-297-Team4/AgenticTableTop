@@ -6,11 +6,11 @@ from langchain_openai import ChatOpenAI
 # LLM Configuration
 # These settings control the connection and behavior of the Large Language Model API
 # Please fill in your own API information below
-MODEL_TYPE = "OPENAI"  # OPENAI or GEMINI
+MODEL_TYPE = "GEMINI"  # OPENAI or GEMINI
 API_BASE = (
-    "https://api.openai.com/v1"  # "https://api.openai.com/v1" or "https://gemini.google.com/v1" etc
+    "https://gemini.google.com/v1"  # "https://api.openai.com/v1" or "https://gemini.google.com/v1" etc
 )
-MODEL = "gpt-4o-mini"  # "gpt-4o-mini" or "gemini-2.5-flash" etc
+MODEL = "gemini-2.5-flash"  # "gpt-4o-mini" or "gemini-2.5-flash" etc
 LLM_REQUEST_TIMEOUT = 60
 TEMPERATURE = 0.7  # The temperature of the model: the lower the value, the more consistent the output of the model
 OPENAI_MAX_TOKENS = 3000  # The max token limit for the response completion
