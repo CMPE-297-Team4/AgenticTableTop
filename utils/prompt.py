@@ -15,12 +15,21 @@ Your goal is to take the player’s outline and expand it into a detailed backgr
 5. Do **not** write dialogue or game stats — focus on atmosphere and story context only.
 
 # Output Format
-Return your result strictly in JSON format and must have the following fields:
+CRITICAL: Return ONLY valid JSON. Do NOT wrap it in markdown code blocks (no ```json). Return ONLY the raw JSON object, nothing else.
+
+The JSON must be complete, parseable, and have ALL of the following required fields:
 {
   "title": "<short title of the story>",
   "background_story": "<the full story text>",
   "key_themes": ["theme1", "theme2", "theme3"]
 }
+
+IMPORTANT:
+- Start your response with { and end with }
+- Do NOT use markdown code blocks (no ```json or ```)
+- Ensure all strings are properly quoted and escaped
+- Ensure all brackets and braces are properly closed
+- The JSON must be complete - do not truncate it
 
 # Example
 <outline>
@@ -40,7 +49,7 @@ A forgotten desert kingdom swallowed by sandstorms, ruled by a sleeping god bene
 {{user_outline}}
 </outline>
 
-Generate the output JSON now.
+Return ONLY the JSON object, starting with { and ending with }. No markdown, no code blocks, no explanations - just the raw JSON.
 """
 
 game_plan_prompt = """
@@ -75,7 +84,9 @@ The title of the story is: <title>
 The background of the story is: <background>
 
 # Output Format
-Return your result strictly in JSON:
+CRITICAL: Return ONLY valid JSON. Do NOT wrap it in markdown code blocks (no ```json). Return ONLY the raw JSON object, nothing else.
+
+The JSON must be complete, parseable, and have ALL of the following required fields:
 {
   "title": "<same as input title>",
   "acts": [
@@ -97,6 +108,13 @@ Return your result strictly in JSON:
   "open_threads_to_resolve_later": ["", ""]
 }
 
+IMPORTANT:
+- Start your response with { and end with }
+- Do NOT use markdown code blocks (no ```json or ```)
+- Ensure all strings are properly quoted and escaped
+- Ensure all brackets and braces are properly closed
+- The JSON must be complete - do not truncate it
+
 # Example Output
 {
   "title": "The Laughter of Shadows",
@@ -116,9 +134,10 @@ Return your result strictly in JSON:
   ],
   "progression_overview": "Acts escalate from localized outbreaks to deep-wood incursions, then to confronting lieutenants amplifying cursed mirth, culminating in a moral resolution about sealing or redeeming the source.",
   "core_themes": ["joy vs control", "trust and community", "power of stories"],
-  "open_threads_to_resolve_later": ["True nature of the Goddess’s laughter", "Origin of the echo points network"]
+  "open_threads_to_resolve_later": ["True nature of the Goddess's laughter", "Origin of the echo points network"]
 }
 
+Return ONLY the JSON object, starting with { and ending with }. No markdown, no code blocks, no explanations - just the raw JSON.
 """
 
 quest_generation_prompt = """
@@ -166,7 +185,9 @@ Your job: Generate 3-5 quests for the given act that drive the story forward and
 <mechanics>
 
 # Output Format
-Return your result strictly in JSON:
+CRITICAL: Return ONLY valid JSON. Do NOT wrap it in markdown code blocks (no ```json). Return ONLY the raw JSON object, nothing else.
+
+The JSON must be complete, parseable, and have ALL of the following required fields:
 {
   "act_title": "<same as input>",
   "quests": [
@@ -185,6 +206,13 @@ Return your result strictly in JSON:
     }
   ]
 }
+
+IMPORTANT:
+- Start your response with { and end with }
+- Do NOT use markdown code blocks (no ```json or ```)
+- Ensure all strings are properly quoted and escaped
+- Ensure all brackets and braces are properly closed
+- The JSON must be complete - do not truncate it
 
 # Example Output
 {
@@ -244,5 +272,182 @@ Return your result strictly in JSON:
   ]
 }
 
-Generate the quests now.
+Return ONLY the JSON object, starting with { and ending with }. No markdown, no code blocks, no explanations - just the raw JSON.
+"""
+
+monster_generation_prompt = """
+You are an expert D&D Monster Designer creating balanced encounters for a campaign.
+
+Your job: Generate 1-3 monsters for a specific combat quest that are thematically appropriate and balanced for the party level. Always generate at least 1 monster.
+
+# Instructions
+1. Read the quest details carefully (name, description, objectives, difficulty)
+2. Design monsters that:
+   - Fit the quest's theme and setting
+   - Are appropriate for the quest's difficulty level
+   - Provide interesting tactical challenges
+   - Have unique abilities and characteristics
+3. Ensure monsters are balanced according to D&D 5e rules
+4. Include both combat stats and roleplay elements
+
+# Quest Details
+===Quest Name===
+<quest_name>
+
+===Quest Description===
+<quest_description>
+
+===Quest Type===
+<quest_type>
+
+===Difficulty===
+<difficulty>
+
+===Key Locations===
+<locations>
+
+===Objectives===
+<objectives>
+
+# Monster Design Guidelines
+- **Challenge Rating (CR)**: Use appropriate CR for the difficulty level
+  - Easy: CR 1/4 to CR 1
+  - Medium: CR 1 to CR 3
+  - Hard: CR 3 to CR 6
+  - Deadly: CR 6+
+- **Hit Points**: Use average HP for the creature type
+- **Armor Class**: Appropriate for the creature's natural defenses
+- **Speed**: Include walking speed and any special movement
+- **Abilities**: Include 1-3 special abilities or attacks
+- **Resistances/Immunities**: Include if thematically appropriate
+- **Senses**: Include passive Perception and any special senses
+
+# Output Format
+CRITICAL: Return ONLY valid JSON. Do NOT wrap it in markdown code blocks (no ```json). Return ONLY the raw JSON object, nothing else.
+
+The JSON must be complete, parseable, and have ALL of the following required fields with correct data types:
+{
+  "quest_name": "<same as input>",
+  "monsters": [
+    {
+      "name": "<string>",
+      "size": "<string: Tiny, Small, Medium, Large, Huge, or Gargantuan>",
+      "type": "<string: e.g., 'undead', 'construct', 'dragon'>",
+      "alignment": "<string: e.g., 'chaotic evil', 'neutral'>",
+      "armor_class": <number: integer>,
+      "hit_points": <number: integer>,
+      "speed": "<string: e.g., '30 ft., fly 60 ft.'>",
+      "strength": <number: integer 1-30>,
+      "dexterity": <number: integer 1-30>,
+      "constitution": <number: integer 1-30>,
+      "intelligence": <number: integer 1-30>,
+      "wisdom": <number: integer 1-30>,
+      "charisma": <number: integer 1-30>,
+      "challenge_rating": "<string: e.g., '3', '1/2', '1/4'>",
+      "proficiency_bonus": <number: integer>,
+      "saving_throws": ["<string>", ...] or [],
+      "skills": ["<string>", ...] or [],
+      "damage_resistances": ["<string>", ...] or [],
+      "damage_immunities": ["<string>", ...] or [],
+      "condition_immunities": ["<string>", ...] or [],
+      "senses": "<string: e.g., 'darkvision 60 ft., passive Perception 10'>",
+      "languages": "<string: e.g., 'Common, Draconic'>",
+      "special_abilities": [
+        {
+          "name": "<string>",
+          "description": "<string>"
+        }
+      ] or [],
+      "actions": [
+        {
+          "name": "<string>",
+          "description": "<string>",
+          "attack_bonus": <number: integer>,
+          "damage": "<string: e.g., '2d6 + 3'>",
+          "damage_type": "<string: e.g., 'necrotic', 'slashing'>"
+        }
+      ] or [],
+      "legendary_actions": [] or [<array of legendary action objects>],
+      "description": "<string: lore/visual description>",
+      "tactics": "<string: combat tactics>",
+      "treasure": "<string: e.g., '1d4 gold pieces'>",
+      "environment": "<string: where this monster is found>"
+    }
+  ]
+}
+
+DATA TYPE REQUIREMENTS:
+- Numbers (armor_class, hit_points, ability scores, etc.): Use integers, NOT strings
+- Strings (name, size, type, etc.): Use quoted strings
+- Arrays (saving_throws, skills, etc.): Use [] for empty arrays, NOT null
+- challenge_rating: Must be a STRING (e.g., "3", "1/2", "1/4"), NOT a number
+- All string fields must be non-empty strings, even if brief
+- The "monsters" array must contain at least 1 monster object (generate 1-3 monsters)
+
+IMPORTANT JSON FORMAT RULES:
+- Start your response with { and end with }
+- Do NOT use markdown code blocks (no ```json or ```)
+- Escape special characters in strings: use \\n for newlines, \\" for quotes
+- Ensure all strings are properly quoted and escaped
+- Ensure all brackets and braces are properly closed
+- Arrays must be complete - do not truncate arrays mid-element
+- The JSON must be complete - do not truncate the response
+- Use [] for empty arrays, never null or undefined
+
+# Example Output
+{
+  "quest_name": "Cleansing the Shrine",
+  "monsters": [
+    {
+      "name": "Laughing Shade",
+      "size": "Medium",
+      "type": "undead",
+      "alignment": "chaotic evil",
+      "armor_class": 13,
+      "hit_points": 45,
+      "speed": "30 ft., fly 60 ft. (hover)",
+      "strength": 8,
+      "dexterity": 17,
+      "constitution": 12,
+      "intelligence": 6,
+      "wisdom": 10,
+      "charisma": 8,
+      "challenge_rating": "3",
+      "proficiency_bonus": 2,
+      "saving_throws": ["Dex +5"],
+      "skills": ["Stealth +5"],
+      "damage_resistances": ["necrotic", "psychic"],
+      "damage_immunities": ["poison"],
+      "condition_immunities": ["charmed", "exhaustion", "frightened", "poisoned"],
+      "senses": "darkvision 60 ft., passive Perception 10",
+      "languages": "understands Common but can't speak",
+      "special_abilities": [
+        {
+          "name": "Incorporeal Movement",
+          "description": "The shade can move through other creatures and objects as if they were difficult terrain. It takes 5 (1d10) force damage if it ends its turn inside an object."
+        },
+        {
+          "name": "Maddening Laughter",
+          "description": "As a bonus action, the shade can emit a burst of maddening laughter. Each creature within 10 feet must make a DC 13 Wisdom saving throw or be frightened until the end of the shade's next turn."
+        }
+      ],
+      "actions": [
+        {
+          "name": "Life Drain",
+          "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one creature. Hit: 10 (2d6 + 3) necrotic damage. The target must make a DC 13 Constitution saving throw, taking 5 (1d10) necrotic damage on a failed save, or half as much damage on a successful one.",
+          "attack_bonus": 5,
+          "damage": "2d6 + 3",
+          "damage_type": "necrotic"
+        }
+      ],
+      "legendary_actions": [],
+      "description": "A twisted spirit bound to the corrupted shrine, its form flickers between solid and ethereal. Its laughter echoes with the madness of the curse it embodies.",
+      "tactics": "The shade uses its incorporeal movement to phase through walls and attack from unexpected angles. It prioritizes isolating weaker party members and uses Maddening Laughter to control the battlefield.",
+      "treasure": "1d4 cursed gold pieces that cause nightmares",
+      "environment": "Corrupted shrines, cursed locations, places of negative energy"
+    }
+  ]
+}
+
+Return ONLY the JSON object, starting with { and ending with }. No markdown, no code blocks, no explanations - just the raw JSON.
 """

@@ -95,6 +95,80 @@ export interface NPCImageResponse {
   prompt_used: string;
 }
 
+export interface Monster {
+  name: string;
+  size: string;
+  type: string;
+  alignment: string;
+  armor_class: number;
+  hit_points: number;
+  speed: string;
+  strength: number;
+  dexterity: number;
+  constitution: number;
+  intelligence: number;
+  wisdom: number;
+  charisma: number;
+  challenge_rating: string;
+  proficiency_bonus: number;
+  saving_throws: string[];
+  skills: string[];
+  damage_resistances: string[];
+  damage_immunities: string[];
+  condition_immunities: string[];
+  senses: string;
+  languages: string;
+  special_abilities: Array<{
+    name: string;
+    description: string;
+  }>;
+  actions: Array<{
+    name: string;
+    description: string;
+    attack_bonus: number;
+    damage: string;
+    damage_type: string;
+  }>;
+  legendary_actions: any[];
+  description: string;
+  tactics: string;
+  treasure: string;
+  environment: string;
+}
+
+export interface MonsterGenerationRequest {
+  quest_name: string;
+  quest_description: string;
+  quest_type: string;
+  difficulty?: string;
+  locations?: string[];
+  objectives?: string[];
+  quest_context?: string;
+}
+
+export interface MonsterResponse {
+  quest_name: string;
+  monsters: Monster[];
+}
+
+export interface CombatRequest {
+  player_name: string;
+  player_max_hp: number;
+  player_armor_class: number;
+  player_dexterity_modifier: number;
+  monster_name: string;
+  monster_data: Monster;
+}
+
+export interface CombatResponse {
+  combat_log: string[];
+  result: string;
+  player_hp: number;
+  monster_hp: number;
+  round: number;
+  current_turn: string;
+}
+
 /**
  * Generate a complete D&D campaign with story, acts, and quests
  */
@@ -311,6 +385,73 @@ export async function healthCheck(): Promise<{ status: string; service: string }
     throw new Error('API is not available');
   }
   
+  return response.json();
+}
+
+/**
+ * Generate monsters for a combat quest
+ */
+export async function generateMonsters(
+  request: MonsterGenerationRequest
+): Promise<MonsterResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/generate-monsters`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `Failed to generate monsters: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Simulate combat between a player and monster
+ */
+export async function simulateCombat(
+  request: CombatRequest
+): Promise<CombatResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/simulate-combat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `Failed to simulate combat: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get a formatted stat block for a monster
+ */
+export async function getMonsterStatBlock(
+  monsterName: string,
+  monsterData: Monster
+): Promise<{ monster_name: string; stat_block: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/monster-stat-block/${encodeURIComponent(monsterName)}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ monster_data: monsterData }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `Failed to get stat block: ${response.statusText}`);
+  }
+
   return response.json();
 }
 
