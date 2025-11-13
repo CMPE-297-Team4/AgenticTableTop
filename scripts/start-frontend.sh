@@ -4,7 +4,7 @@
 echo "Starting AgenticTableTop Frontend..."
 echo ""
 
-cd ui
+cd src/ui
 
 # Check if node_modules exists
 if [ ! -d "node_modules" ]; then

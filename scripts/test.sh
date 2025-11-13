@@ -11,11 +11,14 @@ echo ""
 # Change to project root directory
 cd "$(dirname "$0")/.."
 
+# Add src/ to PYTHONPATH so modules can be imported
+export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
+
 # Check if pytest-cov is installed
 if pip show pytest-cov >/dev/null 2>&1; then
     # Run pytest with coverage
     echo "Running tests with coverage..."
-    pytest -v --cov=utils --cov=main --cov-report=term-missing --cov-report=html
+    pytest -v --cov=src --cov=api --cov-report=term-missing --cov-report=html
     
     echo ""
     echo "================================"

@@ -10,15 +10,15 @@ These are **actively used** in the codebase and required for the project to run:
 
 ### Essential
 - **pydantic** (2.11.1) - Data validation and settings management
-  - Used in: `utils/state.py` for GameStatus model
+  - Used in: `src/core/state.py` for GameStatus model
 - **PyYAML** - YAML configuration file parsing
-  - Used in: `utils/agents.py` for loading `config.yaml`
+  - Used in: `src/core/agents.py` for loading `config.yaml`
 
 ### LLM Providers
 - **langchain-openai** - OpenAI GPT integration
-  - Used in: `utils/model.py` for ChatOpenAI
+  - Used in: `src/core/model.py` for ChatOpenAI
 - **langchain-google-genai** - Google Gemini integration
-  - Used in: `utils/model.py` for ChatGoogleGenerativeAI
+  - Used in: `src/core/model.py` for ChatGoogleGenerativeAI
 
 ### Framework
 - **langgraph** (0.6.8) - Agent orchestration framework

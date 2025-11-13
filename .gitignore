@@ -89,3 +89,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Database
+agentictabletop.db

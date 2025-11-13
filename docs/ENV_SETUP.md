@@ -51,7 +51,7 @@ export OPENAI_API_KEY="your-key-here"
 export GEMINI_API_KEY="your-key-here"
 
 # Run the application
-python main.py
+make start-all  # or make api for API only
 ```
 
 **Pros:** Quick and easy
@@ -79,10 +79,7 @@ Then install python-dotenv and load it:
 pip install python-dotenv
 ```
 
-Add to the top of `main.py`:
-```python
-from dotenv import load_dotenv
-load_dotenv()  # Load .env file
+The application automatically loads `.env` files using `python-dotenv`. No code changes needed!
 ```
 
 **Pros:** Keys persist, not in shell history
@@ -123,7 +120,7 @@ If you see your key (or part of it), it's set correctly!
 
 ## Configuration
 
-After setting up API keys, configure which model to use in `utils/model.py`:
+After setting up API keys, configure which model to use in `src/core/model.py`:
 
 ```python
 MODEL_TYPE = "OPENAI"  # or "GEMINI"
@@ -217,7 +214,7 @@ OPENAI_API_KEY="real-key" pytest tests/ -m integration
 export OPENAI_API_KEY="sk-proj-your-key"
 
 # Run application
-python main.py
+make start-all  # or make api for API only
 
 # Run tests (uses mocks, no keys needed)
 pytest tests/
@@ -230,8 +227,8 @@ env | grep API_KEY
 
 After setting up environment variables:
 1. Verify keys are set: `echo $OPENAI_API_KEY`
-2. Run the application: `python main.py`
-3. Check the output for your generated campaign!
+2. Run the application: `make start-all` (or `make api` for API only)
+3. Access the Web UI at http://localhost:5173 or API docs at http://localhost:8000/docs
 4. Run tests: `pytest tests/`
 
 For more help, see the main [README.md](README.md).

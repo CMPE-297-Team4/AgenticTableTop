@@ -32,7 +32,7 @@ An AI-powered Dungeons & Dragons campaign generator with a beautiful web interfa
 git clone <your-repo-url>
 cd AgenticTableTop
 pip install -r requirements.txt
-cd ui && npm install && cd ..
+cd src/ui && npm install && cd ../..
 
 # 2. Configure API keys
 cp env.example .env
@@ -85,14 +85,7 @@ make start-all
 ```
 Beautiful interface with campaign generator and interactive viewer.
 
-### Option 2: CLI
-```bash
-make run
-# or: python main.py
-```
-Generates campaigns directly in the terminal.
-
-### Option 3: API
+### Option 2: API
 ```bash
 make api
 # Access: http://localhost:8000/docs
@@ -148,46 +141,71 @@ See interactive docs at http://localhost:8000/docs
 
 ```
 AgenticTableTop/
-├── README.md               # This file - main documentation
-├── api.py                  # FastAPI backend server
-├── main.py                 # CLI entry point
-├── config.yaml             # Game configuration
-├── Makefile                # Build and run commands
-├── requirements.txt        # Python dependencies
+├── README.md                    # This file - main documentation
+├── api.py                       # FastAPI backend server
+├── config.yaml                  # Game configuration
+├── Makefile                     # Build and run commands
+├── requirements.txt             # Python dependencies
 │
-├── docs/                   # Documentation
-│   ├── INTRO.md            # Beginner's guide to D&D
-│   ├── INTEGRATION_GUIDE.md    # Technical integration details
-│   ├── ENV_SETUP.md        # Environment setup
-│   ├── TESTING_SETUP.md    # Testing guide
-│   └── DEPENDENCIES.md     # Dependency management
+├── src/                         # Source code directory
+│   ├── core/                    # Core functionality
+│   │   ├── agents.py           # AI agents (story, planner, quests)
+│   │   ├── model.py            # LLM initialization
+│   │   ├── prompt.py           # Prompt templates
+│   │   ├── rag_prompts.py      # RAG-augmented prompts
+│   │   └── state.py            # Game state management
+│   ├── api/                     # API and authentication
+│   │   ├── server.py           # FastAPI app setup
+│   │   ├── dependencies.py     # Auth dependencies
+│   │   ├── models.py           # Request/response models
+│   │   ├── auth.py             # Authentication utilities
+│   │   └── routes/             # Route handlers
+│   ├── services/                # External services
+│   │   ├── rag.py              # RAG service
+│   │   ├── pinecone.py         # Pinecone integration
+│   │   ├── cache.py            # LLM response caching
+│   │   ├── character.py        # Character generation
+│   │   └── trajectory.py       # Trajectory logging
+│   ├── database/               # Database models
+│   │   └── models.py           # SQLAlchemy models
+│   ├── combat/                 # Combat system
+│   │   └── system.py           # Combat mechanics
+│   ├── tools/                   # Utility tools
+│   │   └── utils.py            # Helper functions
+│   ├── schemas/                 # Data schemas
+│   │   └── models.py           # Pydantic models
+│   │
+│   └── ui/                      # React frontend
+│       ├── src/
+│       │   ├── pages/
+│       │   │   ├── Index.tsx    # Campaign generator
+│       │   │   └── Game.tsx     # Campaign viewer
+│       │   ├── services/
+│       │   │   └── campaignApi.ts # Backend API client
+│       │   └── components/ui/  # Shadcn UI components
+│       └── package.json
 │
-├── scripts/                # Utility scripts
-│   ├── start-backend.sh    # Start backend API
-│   ├── start-frontend.sh   # Start frontend UI
-│   ├── start-all.sh        # Start both
-│   ├── setup_dev.sh        # Development setup
-│   ├── test.sh             # Run tests
-│   └── format.sh           # Code formatting
+├── docs/                        # Documentation
+│   ├── QUICK_START.md           # Quick start guide
+│   ├── INTRO.md                 # Beginner's guide to D&D
+│   ├── ARCHITECTURE.md          # System architecture diagram
+│   ├── ENV_SETUP.md             # Environment setup
+│   ├── RAG_SETUP.md             # RAG setup guide
+│   ├── TESTING_SETUP.md         # Testing guide
+│   └── DEPENDENCIES.md          # Dependency management
 │
-├── utils/                  # Core Python modules
-│   ├── agents.py           # AI agents (story, planner, quests)
-│   ├── model.py            # LLM initialization
-│   ├── prompt.py           # Prompt templates
-│   ├── state.py            # Game state management
-│   └── tools.py            # Utilities (dice, parsers)
+├── scripts/                     # Utility scripts
+│   ├── start-backend.sh         # Start backend API
+│   ├── start-frontend.sh        # Start frontend UI
+│   ├── start-all.sh             # Start both
+│   ├── setup_dev.sh             # Development setup
+│   ├── test.sh                  # Run tests
+│   └── format.sh                # Code formatting
 │
-├── ui/                     # React frontend
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── Index.tsx   # Campaign generator
-│   │   │   └── Game.tsx    # Campaign viewer
-│   │   ├── services/
-│   │   │   └── campaignApi.ts  # Backend API client
-│   │   └── components/ui/  # Shadcn UI components
-│   └── package.json
+├── examples/                    # Example code
+│   └── rag_examples.py          # RAG usage examples
 │
-└── tests/                  # Test suite
+└── tests/                       # Test suite
     ├── test_agents.py
     ├── test_model.py
     └── test_tools.py
@@ -209,9 +227,9 @@ Get API keys:
 
 ### Customization
 - **Game Settings**: Edit `config.yaml`
-- **LLM Model**: Edit `utils/model.py`
-- **Prompts**: Edit `utils/prompt.py`
-- **Frontend API URL**: Create `ui/.env` with `VITE_API_URL=http://localhost:8000`
+- **LLM Model**: Edit `src/core/model.py`
+- **Prompts**: Edit `src/core/prompt.py`
+- **Frontend API URL**: Create `src/ui/.env` with `VITE_API_URL=http://localhost:8000`
 
 ## Development
 
@@ -238,7 +256,6 @@ make lint              # Run linter only
 ```bash
 make help              # Show all commands
 make install           # Install dependencies
-make run               # Run CLI generator
 make api               # Start backend API
 make frontend          # Start frontend UI
 make start-all         # Start both
@@ -338,8 +355,10 @@ lsof -ti:8000 | xargs kill -9
 ## Documentation
 
 - **[docs/INTRO.md](docs/INTRO.md)** - Beginner's guide to D&D and this project *(Start here!)*
-- **[docs/INTEGRATION_GUIDE.md](docs/INTEGRATION_GUIDE.md)** - Detailed architecture and integration
+- **[docs/QUICK_START.md](docs/QUICK_START.md)** - Quick start guide
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture and component connections
 - **[docs/ENV_SETUP.md](docs/ENV_SETUP.md)** - Environment variable setup guide
+- **[docs/RAG_SETUP.md](docs/RAG_SETUP.md)** - RAG setup guide
 - **[docs/TESTING_SETUP.md](docs/TESTING_SETUP.md)** - Testing infrastructure
 - **[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)** - Dependency management
 
@@ -385,7 +404,6 @@ See [docs/TESTING_SETUP.md](docs/TESTING_SETUP.md) for more details.
 - Integrated frontend with backend via REST API
 - Added startup scripts (`make start-all`)
 - Removed Supabase authentication for local-first development
-- Created comprehensive integration documentation
 
 ### 10/12/2025 - Quest System
 - Added quest generation system (3-5 quests per act)

@@ -1,5 +1,5 @@
 """
-Unit tests for utils/model.py
+Unit tests for core/model.py
 """
 
 from unittest.mock import MagicMock, patch
@@ -10,15 +10,15 @@ import pytest
 pytest.importorskip("langchain_openai")
 pytest.importorskip("langchain_google_genai")
 
-from utils.model import initialize_llm  # noqa: E402
+from core.model import initialize_llm  # noqa: E402
 
 
 class TestInitializeLLM:
     """Tests for initialize_llm function"""
 
-    @patch("utils.model.OPENAI_API_KEY", "test-openai-key")
-    @patch("utils.model.MODEL_TYPE", "OPENAI")
-    @patch("utils.model.ChatOpenAI")
+    @patch("core.model.OPENAI_API_KEY", "test-openai-key")
+    @patch("core.model.MODEL_TYPE", "OPENAI")
+    @patch("core.model.ChatOpenAI")
     def test_initialize_openai_llm(self, mock_chat_openai):
         """Test initialization of OpenAI LLM"""
         mock_instance = MagicMock()
@@ -29,9 +29,9 @@ class TestInitializeLLM:
         mock_chat_openai.assert_called_once()
         assert result == mock_instance
 
-    @patch("utils.model.GEMINI_API_KEY", "test-gemini-key")
-    @patch("utils.model.MODEL_TYPE", "GEMINI")
-    @patch("utils.model.ChatGoogleGenerativeAI")
+    @patch("core.model.GEMINI_API_KEY", "test-gemini-key")
+    @patch("core.model.MODEL_TYPE", "GEMINI")
+    @patch("core.model.ChatGoogleGenerativeAI")
     def test_initialize_gemini_llm(self, mock_chat_gemini):
         """Test initialization of Gemini LLM"""
         mock_instance = MagicMock()
@@ -42,16 +42,16 @@ class TestInitializeLLM:
         mock_chat_gemini.assert_called_once()
         assert result == mock_instance
 
-    @patch("utils.model.OPENAI_API_KEY", "")
-    @patch("utils.model.GEMINI_API_KEY", "")
+    @patch("core.model.OPENAI_API_KEY", "")
+    @patch("core.model.GEMINI_API_KEY", "")
     def test_initialize_llm_without_api_keys_raises_error(self):
         """Test that initialization without API keys raises ValueError"""
         with pytest.raises(ValueError, match="Please set up your API keys"):
             initialize_llm()
 
-    @patch("utils.model.OPENAI_API_KEY", "test-openai-key")
-    @patch("utils.model.MODEL_TYPE", "OPENAI")
-    @patch("utils.model.ChatOpenAI")
+    @patch("core.model.OPENAI_API_KEY", "test-openai-key")
+    @patch("core.model.MODEL_TYPE", "OPENAI")
+    @patch("core.model.ChatOpenAI")
     def test_initialize_llm_uses_correct_model_name(self, mock_chat_openai):
         """Test that initialization uses the configured model name"""
         mock_instance = MagicMock()

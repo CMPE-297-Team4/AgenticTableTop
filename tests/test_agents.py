@@ -1,10 +1,10 @@
 """
-Unit tests for utils/agents.py
+Unit tests for core/agents.py
 """
 
 import pytest
 
-from utils.agents import background_story, generate_game_plan, generate_quests_for_act
+from core.agents import background_story, generate_game_plan, generate_quests_for_act
 
 
 class TestBackgroundStory:
