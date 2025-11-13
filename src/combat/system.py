@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
+from core.monster_agent import MonsterAgent
 from tools.utils import dice_roll
 
 
@@ -111,13 +112,24 @@ class Combatant:
 class CombatEncounter:
     """Manages a combat encounter."""
 
-    def __init__(self, combatants: List[Combatant]):
+    def __init__(
+        self, combatants: List[Combatant], monster_data: Optional[Dict[str, Dict[str, Any]]] = None
+    ):
+        """
+        Initialize combat encounter.
+
+        Args:
+            combatants: List of Combatant objects
+            monster_data: Optional dict mapping monster names to their stat blocks
+        """
         self.combatants = combatants
         self.current_turn = 0
         self.round = 1
         self.initiative_order = []
         self.combat_log = []
         self.is_active = False
+        self.monster_data = monster_data or {}  # Map monster names to stat blocks
+        self.monster_agent = MonsterAgent() if monster_data else None
 
         # Sort by initiative (highest first)
         self.initiative_order = sorted(combatants, key=lambda x: x.initiative, reverse=True)
@@ -177,6 +189,68 @@ class CombatEncounter:
     def add_combat_log(self, message: str):
         """Add a message to the combat log."""
         self.combat_log.append(message)
+
+    def get_monster_action(self, monster_combatant: Combatant) -> Dict[str, Any]:
+        """
+        Get AI decision for a monster's action in combat.
+
+        Args:
+            monster_combatant: The monster Combatant whose turn it is
+
+        Returns:
+            Dict with action, target, description, and reasoning
+        """
+        if not self.monster_agent or not self.monster_data:
+            # Fallback: simple attack
+            enemies = [c.name for c in self.combatants if c.is_player and c.is_conscious]
+            target = enemies[0] if enemies else None
+            return {
+                "action": "ATTACK",
+                "target": target,
+                "description": f"{monster_combatant.name} attacks {target or 'the nearest enemy'}!",
+                "reasoning": "No AI agent available",
+            }
+
+        # Get monster stat block
+        monster_stat_block = self.monster_data.get(monster_combatant.name, {})
+        if not monster_stat_block:
+            # Fallback
+            enemies = [c.name for c in self.combatants if c.is_player and c.is_conscious]
+            target = enemies[0] if enemies else None
+            return {
+                "action": "ATTACK",
+                "target": target,
+                "description": f"{monster_combatant.name} attacks {target or 'the nearest enemy'}!",
+                "reasoning": "Monster stat block not found",
+            }
+
+        # Update monster HP in stat block
+        monster_stat_block["current_hp"] = monster_combatant.current_hp
+
+        # Build combat context
+        enemies = [c.name for c in self.combatants if c.is_player and c.is_conscious]
+        allies = [
+            c.name
+            for c in self.combatants
+            if not c.is_player and c.name != monster_combatant.name and c.is_conscious
+        ]
+        initiative_order = [c.name for c in self.initiative_order]
+
+        combat_context = {
+            "round": self.round,
+            "initiative_order": initiative_order,
+            "enemies": enemies,
+            "allies": allies,
+            "situation": f"Round {self.round}, {monster_combatant.name}'s turn",
+        }
+
+        # Get AI decision
+        decision = self.monster_agent.decide_combat_action(
+            monster=monster_stat_block,
+            combat_context=combat_context,
+        )
+
+        return decision
 
 
 def roll_initiative() -> int:

@@ -3,9 +3,12 @@ Character/NPC portrait generation module.
 
 This module provides functionality to generate character portraits using OpenAI's
 image generation API, based on character descriptions and details.
+Also handles full D&D 5e player character generation.
 """
 
+import base64
 import json
+from pathlib import Path
 from typing import Dict, Optional
 
 from openai import OpenAI
@@ -126,3 +129,329 @@ def generate_npc_portrait(
 
     except Exception as e:
         return {"error": f"Failed to generate portrait: {str(e)}", "npc_name": npc_name}
+
+
+# D&D 5e Character Schema (from notebook)
+CHARACTER_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "character_name",
+        "class_and_level",
+        "background",
+        "player_name",
+        "race",
+        "alignment",
+        "experience_points",
+        "abilities",
+        "saving_throws",
+        "skills",
+        "proficiency_bonus",
+        "passive_wisdom",
+        "combat_stats",
+        "attacks_and_spellcasting",
+        "equipment",
+        "other_proficiencies_and_languages",
+        "features_and_traits",
+        "personality_traits",
+        "ideals",
+        "bonds",
+        "flaws",
+        "notes",
+        "portrait",
+    ],
+    "properties": {
+        "character_name": {"type": "string"},
+        "class_and_level": {"type": "string"},
+        "background": {"type": "string"},
+        "player_name": {"type": "string"},
+        "race": {"type": "string"},
+        "alignment": {"type": "string"},
+        "experience_points": {"type": "integer"},
+        "abilities": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "strength": {"type": "integer"},
+                "dexterity": {"type": "integer"},
+                "constitution": {"type": "integer"},
+                "intelligence": {"type": "integer"},
+                "wisdom": {"type": "integer"},
+                "charisma": {"type": "integer"},
+            },
+        },
+        "saving_throws": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "strength": {"type": "boolean"},
+                "dexterity": {"type": "boolean"},
+                "constitution": {"type": "boolean"},
+                "intelligence": {"type": "boolean"},
+                "wisdom": {"type": "boolean"},
+                "charisma": {"type": "boolean"},
+            },
+        },
+        "skills": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "acrobatics": {"type": "boolean"},
+                "animal_handling": {"type": "boolean"},
+                "arcana": {"type": "boolean"},
+                "athletics": {"type": "boolean"},
+                "deception": {"type": "boolean"},
+                "history": {"type": "boolean"},
+                "insight": {"type": "boolean"},
+                "intimidation": {"type": "boolean"},
+                "investigation": {"type": "boolean"},
+                "medicine": {"type": "boolean"},
+                "nature": {"type": "boolean"},
+                "perception": {"type": "boolean"},
+                "performance": {"type": "boolean"},
+                "persuasion": {"type": "boolean"},
+                "religion": {"type": "boolean"},
+                "sleight_of_hand": {"type": "boolean"},
+                "stealth": {"type": "boolean"},
+                "survival": {"type": "boolean"},
+            },
+        },
+        "proficiency_bonus": {"type": "integer"},
+        "passive_wisdom": {"type": "integer"},
+        "combat_stats": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": [
+                "armor_class",
+                "initiative",
+                "speed",
+                "hit_point_maximum",
+                "current_hit_points",
+                "temporary_hit_points",
+                "hit_dice_total",
+                "death_saves",
+            ],
+            "properties": {
+                "armor_class": {"type": "integer"},
+                "initiative": {"type": "integer"},
+                "speed": {"type": "integer"},
+                "hit_point_maximum": {"type": "integer"},
+                "current_hit_points": {"type": "integer"},
+                "temporary_hit_points": {"type": "integer"},
+                "hit_dice_total": {"type": "string"},
+                "death_saves": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["successes", "failures"],
+                    "properties": {
+                        "successes": {"type": "integer"},
+                        "failures": {"type": "integer"},
+                    },
+                },
+            },
+        },
+        "attacks_and_spellcasting": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "attack_bonus": {"type": "string"},
+                    "damage_type": {"type": "string"},
+                },
+            },
+        },
+        "equipment": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "quantity": {"type": "integer"},
+                },
+            },
+        },
+        "other_proficiencies_and_languages": {"type": "array", "items": {"type": "string"}},
+        "features_and_traits": {"type": "array", "items": {"type": "string"}},
+        "personality_traits": {"type": "string"},
+        "ideals": {"type": "string"},
+        "bonds": {"type": "string"},
+        "flaws": {"type": "string"},
+        "notes": {"type": "string"},
+        "portrait": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["image_path"],
+            "properties": {
+                "image_path": {"type": "string"},
+                "prompt": {"type": "string", "default": ""},
+            },
+        },
+    },
+}
+
+
+def generate_player_character(
+    character_name: str,
+    class_and_level: str,
+    race: str,
+    background: str,
+    alignment: str,
+    player_name: Optional[str] = None,
+) -> Dict:
+    """
+    Generate a full D&D 5e character using OpenAI with function calling.
+
+    Args:
+        character_name: Name of the character
+        class_and_level: Class and level (e.g., "Ranger 1")
+        race: Character race (e.g., "Human")
+        background: Character background (e.g., "Faceless")
+        alignment: Character alignment (e.g., "True Neutral")
+        player_name: Optional player name (defaults to character_name)
+
+    Returns:
+        Dict containing:
+        - character: Full character JSON
+        - image_base64: Base64 encoded portrait
+        - image_path: Path to saved image
+        - portrait_prompt: Prompt used for portrait
+        - error: Error message if generation failed
+    """
+    try:
+        client = OpenAI()
+        player_name = player_name or character_name
+
+        # Create user prompt for character generation
+        user_prompt = (
+            f"Create a DnD 5e character with this concept:\n"
+            f"- Name: {character_name}\n"
+            f"- Class & Level: {class_and_level}\n"
+            f"- Race: {race}\n"
+            f"- Background: {background}\n"
+            f"- Alignment: {alignment}\n"
+            f"- Player Name: {player_name}\n"
+            "Fill every field of the provided schema with reasonable, rules-consistent values. "
+            "When ready, call save_character with the fully filled JSON."
+        )
+
+        # Define function tools
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "save_character",
+                    "description": "Save the character JSON",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "character": CHARACTER_SCHEMA,
+                            "filename_hint": {"type": "string"},
+                        },
+                        "required": ["character"],
+                    },
+                },
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "generate_portrait",
+                    "description": "Generate a fantasy portrait image for a DnD character using their details.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "prompt": {
+                                "type": "string",
+                                "description": "A descriptive text prompt for the portrait.",
+                            },
+                            "character_name": {"type": "string"},
+                        },
+                        "required": ["prompt", "character_name"],
+                    },
+                },
+            },
+        ]
+
+        # Generate character using OpenAI
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            tools=tools,
+            tool_choice="auto",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a structured DnD character generator. Only respond by calling tools or returning valid JSON.",
+                },
+                {
+                    "role": "system",
+                    "content": "All fields must match the provided JSON schema and types. Use sensible defaults where data is unknown.",
+                },
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+
+        message = response.choices[0].message
+        if not message.tool_calls:
+            return {
+                "error": "Model did not call save_character. Check schema/fields or loosen constraints."
+            }
+
+        # Extract character from tool call
+        tool_call = message.tool_calls[0]
+        if tool_call.function.name != "save_character":
+            return {"error": f"Expected save_character call, got {tool_call.function.name}"}
+
+        args = json.loads(tool_call.function.arguments)
+        character = args["character"]
+
+        # Generate portrait prompt
+        prompt_gen = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Write a concise, vivid portrait prompt for a fantasy art generator.",
+                },
+                {
+                    "role": "system",
+                    "content": "Style: painterly fantasy portrait; head-and-shoulders; neutral background that hints at their theme; avoid copyrighted names.",
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "Compose a single-sentence portrait prompt using these details. "
+                        "Include race, class, level, alignment, background, notable gear/themes, and an overall vibe.\n"
+                        f"{json.dumps({k: character.get(k) for k in ['character_name', 'class_and_level', 'race', 'alignment', 'background']})}"
+                    ),
+                },
+            ],
+        )
+        portrait_prompt = prompt_gen.choices[0].message.content.strip()
+
+        # Generate portrait image
+        img_result = client.images.generate(
+            model="dall-e-3", prompt=portrait_prompt, size="1024x1024", response_format="b64_json"
+        )
+        image_b64 = img_result.data[0].b64_json
+
+        # Save image to file (optional, for reference)
+        characters_dir = Path(__file__).parent.parent.parent / "characters"
+        characters_dir.mkdir(exist_ok=True)
+        filename = f"{_slug(character_name)}.png"
+        image_path = characters_dir / filename
+
+        with open(image_path, "wb") as f:
+            f.write(base64.b64decode(image_b64))
+
+        # Update character with portrait info
+        character["portrait"] = {"image_path": str(image_path), "prompt": portrait_prompt}
+
+        return {
+            "character": character,
+            "image_base64": image_b64,
+            "image_path": str(image_path),
+            "portrait_prompt": portrait_prompt,
+        }
+
+    except Exception as e:
+        return {"error": f"Failed to generate player character: {str(e)}"}

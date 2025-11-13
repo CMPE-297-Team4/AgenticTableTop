@@ -150,3 +150,59 @@ class CombatResponse(BaseModel):
     monster_hp: int
     round: int
     current_turn: str
+
+
+class PlayerCharacterCreateRequest(BaseModel):
+    """Request model for player character creation"""
+
+    character_name: str
+    class_and_level: str
+    race: str
+    background: str
+    alignment: str
+    player_name: Optional[str] = None
+    campaign_id: Optional[int] = None
+
+
+class PlayerCharacterResponse(BaseModel):
+    """Response model for player character"""
+
+    id: int
+    character_name: str
+    player_name: str
+    class_and_level: str
+    race: str
+    background: str
+    alignment: str
+    character_data: Dict[str, Any]  # Full character sheet JSON
+    image_base64: Optional[str] = None
+    image_path: Optional[str] = None
+    portrait_prompt: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class PlayerCharacterUpdateRequest(BaseModel):
+    """Request model for updating player character (HP, stats, etc.)"""
+
+    character_data: Optional[Dict[str, Any]] = None  # Updated character data
+    current_hit_points: Optional[int] = None  # Quick HP update
+    experience_points: Optional[int] = None  # Quick XP update
+
+
+class PlayerActionRequest(BaseModel):
+    """Request model for player actions"""
+
+    action_type: str  # MOVE, ATTACK, CAST_SPELL, USE_ITEM, TALK, INVESTIGATE, etc.
+    character_name: str
+    description: str  # Description of the action
+    target: Optional[str] = None  # Target of the action (if applicable)
+    parameters: Optional[Dict[str, Any]] = None  # Additional action parameters
+
+
+class PlayerActionResponse(BaseModel):
+    """Response model for player actions"""
+
+    result: str  # "success", "failure", "partial"
+    dm_narration: str  # DM's response to the action
+    state_update: Dict[str, Any]  # Updated game state

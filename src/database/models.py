@@ -8,7 +8,7 @@ Uses SQLite for development (can be switched to PostgreSQL for production).
 import os
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, create_engine
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -77,6 +77,49 @@ class Campaign(Base):
     campaign_data = Column(Text, nullable=True)  # JSON string of full campaign
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PlayerCharacter(Base):
+    """Player Character model for storing full D&D 5e character sheets"""
+
+    __tablename__ = "player_characters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), index=True, nullable=True)
+    character_name = Column(String(200), index=True, nullable=False)
+    player_name = Column(String(200), nullable=False)
+    class_and_level = Column(String(100), nullable=False)
+    race = Column(String(100), nullable=False)
+    background = Column(String(100), nullable=False)
+    alignment = Column(String(50), nullable=False)
+    # Full character data stored as JSON
+    character_data = Column(Text, nullable=False)  # JSON string of full character sheet
+    # Portrait information
+    image_base64 = Column(Text, nullable=True)  # Base64 encoded image
+    image_path = Column(String(500), nullable=True)  # Optional: file path if stored on disk
+    portrait_prompt = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class GameSession(Base):
+    """Game Session model for managing active gameplay sessions"""
+
+    __tablename__ = "game_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), index=True, nullable=False)
+    session_name = Column(String(200), nullable=False)
+    current_act_index = Column(Integer, default=0)
+    current_quest_index = Column(Integer, default=0)
+    session_state = Column(Text, nullable=True)  # JSON string of current game state
+    player_characters = Column(Text, nullable=True)  # JSON array of character IDs in session
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_played_at = Column(DateTime, nullable=True)
 
 
 def init_db():

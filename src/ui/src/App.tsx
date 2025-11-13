@@ -8,6 +8,9 @@ import Index from "./pages/Index";
 import Game from "./pages/Game";
 import Login from "./pages/Login";
 import CampaignLibrary from "./pages/CampaignLibrary";
+import CharacterCreate from "./pages/CharacterCreate";
+import Sessions from "./pages/Sessions";
+import GameSession from "./pages/GameSession";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,6 +63,30 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CampaignLibrary />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/character-create" 
+              element={
+                <ProtectedRoute>
+                  <CharacterCreate />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/sessions" 
+              element={
+                <ProtectedRoute>
+                  <Sessions />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/game-session/:sessionId" 
+              element={
+                <ProtectedRoute>
+                  <GameSession />
                 </ProtectedRoute>
               } 
             />

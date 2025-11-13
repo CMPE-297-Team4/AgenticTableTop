@@ -48,6 +48,9 @@ src/
 │       ├── auth.py               # Authentication endpoints
 │       ├── cache.py              # Cache management
 │       ├── campaigns.py          # Campaign generation & management
+│       ├── characters.py         # Player character management
+│       ├── sessions.py           # Game session management
+│       ├── dm.py                 # Dungeon Master agent API
 │       ├── monsters.py           # Monster generation & combat
 │       ├── npcs.py               # NPC image generation
 │       └── search.py             # Search functionality
@@ -57,17 +60,24 @@ src/
 │   ├── model.py                  # LLM initialization
 │   ├── prompt.py                 # Prompt templates
 │   ├── rag_prompts.py            # RAG-augmented prompts
-│   └── state.py                  # Game state management
+│   ├── state.py                  # Game state management
+│   ├── session.py                # Session state management
+│   ├── gameplay.py               # Gameplay state machine
+│   ├── dm_agent.py               # AI Dungeon Master agent
+│   ├── dm_prompts.py             # DM agent prompts
+│   ├── monster_agent.py         # AI Monster agent
+│   └── monster_prompts.py        # Monster agent prompts
 │
 ├── services/                     # External Services
 │   ├── cache.py                  # LLM response caching
-│   ├── character.py              # NPC portrait generation
+│   ├── character.py              # NPC & player character generation
 │   ├── pinecone.py               # Vector database service
 │   ├── rag.py                    # RAG service
+│   ├── tts.py                    # Text-to-speech service
 │   └── trajectory.py            # Generation logging
 │
 ├── database/                     # Data Persistence
-│   └── models.py                # SQLAlchemy models
+│   └── models.py                # SQLAlchemy models (User, Campaign, NPCImage, PlayerCharacter, GameSession)
 │
 ├── combat/                       # Combat System
 │   └── system.py                # Combat mechanics

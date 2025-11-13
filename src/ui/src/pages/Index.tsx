@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, Library, User, Play, Scroll } from "lucide-react";
+import { Loader2, LogOut, Library, User, Play, Scroll, Users, Gamepad2 } from "lucide-react";
 import { generateCampaign, loadCampaign, listUserCampaigns, type Campaign, type CampaignRequest } from "@/services/campaignApi";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -172,6 +172,24 @@ const Index = () => {
             >
               <Library className="h-4 w-4 mr-2" />
               Library
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/character-create")}
+              className="text-foreground hover:text-primary"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Characters
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/sessions")}
+              className="text-foreground hover:text-primary"
+            >
+              <Gamepad2 className="h-4 w-4 mr-2" />
+              Sessions
             </Button>
             <Button
               variant="ghost"

@@ -16,6 +16,13 @@ An AI-powered Dungeons & Dragons campaign generator with a beautiful web interfa
 - **🆕 Vector Storage** - Pinecone integration for campaign persistence and semantic search
 - **🆕 Campaign Library** - Search and retrieve previously generated campaigns
 - **🆕 RAG System** - Retrieve relevant content for enhanced AI generation
+- **🆕 Full D&D Gameplay** - Complete playable D&D game system:
+  - **AI Dungeon Master** - Intelligent DM that narrates scenes and responds to actions
+  - **Player Character Creation** - Full D&D 5e character sheets with portraits
+  - **Game Sessions** - Save/load gameplay sessions with persistent state
+  - **AI Monster Agents** - Intelligent monsters that make tactical combat decisions
+  - **Turn-Based Combat** - Full combat system with initiative and AI-controlled monsters
+  - **Text-to-Speech** - DM narration with audio output
 
 ## Quick Start (5 Minutes)
 

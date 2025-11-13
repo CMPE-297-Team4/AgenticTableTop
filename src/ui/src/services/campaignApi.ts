@@ -716,3 +716,311 @@ export async function getMonsterStatBlock(
   return response.json();
 }
 
+// ============================================================================
+// Player Character API
+// ============================================================================
+
+export interface PlayerCharacterCreateRequest {
+  character_name: string;
+  class_and_level: string;
+  race: string;
+  background: string;
+  alignment: string;
+  player_name?: string;
+  campaign_id?: number;
+}
+
+export interface PlayerCharacter {
+  id: number;
+  character_name: string;
+  player_name: string;
+  class_and_level: string;
+  race: string;
+  background: string;
+  alignment: string;
+  character_data: any; // Full D&D 5e character sheet
+  image_base64?: string;
+  image_path?: string;
+  portrait_prompt?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function createCharacter(
+  request: PlayerCharacterCreateRequest
+): Promise<PlayerCharacter> {
+  const response = await fetch(`${API_BASE_URL}/api/characters/create`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Failed to create character' }));
+    throw new Error(error.detail || 'Failed to create character');
+  }
+
+  return response.json();
+}
+
+export async function listCharacters(): Promise<PlayerCharacter[]> {
+  const response = await fetch(`${API_BASE_URL}/api/characters`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to list characters');
+  }
+
+  return response.json();
+}
+
+export async function getCharacter(characterId: number): Promise<PlayerCharacter> {
+  const response = await fetch(`${API_BASE_URL}/api/characters/${characterId}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to get character');
+  }
+
+  return response.json();
+}
+
+export async function updateCharacter(
+  characterId: number,
+  updates: { character_data?: any; current_hit_points?: number; experience_points?: number }
+): Promise<PlayerCharacter> {
+  const response = await fetch(`${API_BASE_URL}/api/characters/${characterId}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to update character');
+  }
+
+  return response.json();
+}
+
+export async function deleteCharacter(characterId: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/characters/${characterId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete character');
+  }
+}
+
+export async function regeneratePortrait(characterId: number): Promise<PlayerCharacter> {
+  const response = await fetch(`${API_BASE_URL}/api/characters/${characterId}/portrait`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to regenerate portrait');
+  }
+
+  return response.json();
+}
+
+// ============================================================================
+// Game Session API
+// ============================================================================
+
+export interface GameSession {
+  id: number;
+  session_name: string;
+  campaign_id: number;
+  current_act_index: number;
+  current_quest_index: number;
+  is_active: boolean;
+  state?: any;
+  created_at: string;
+  last_played_at?: string;
+}
+
+export interface CreateSessionRequest {
+  campaign_id: number;
+  session_name: string;
+  character_ids: number[];
+}
+
+export interface PlayerActionRequest {
+  action_type: string;
+  character_name: string;
+  description: string;
+  target?: string;
+  parameters?: any;
+}
+
+export interface PlayerActionResponse {
+  result: string;
+  dm_narration: string;
+  state_update: any;
+}
+
+export async function createSession(request: CreateSessionRequest): Promise<GameSession> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions/create`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Failed to create session' }));
+    throw new Error(error.detail || 'Failed to create session');
+  }
+
+  return response.json();
+}
+
+export async function listSessions(): Promise<GameSession[]> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to list sessions');
+  }
+
+  return response.json();
+}
+
+export async function getSession(sessionId: number): Promise<GameSession> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to get session');
+  }
+
+  return response.json();
+}
+
+export async function startSession(sessionId: number): Promise<{ session_id: number; session_name: string; campaign: Campaign; state: any }> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/start`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to start session');
+  }
+
+  return response.json();
+}
+
+export async function saveSession(sessionId: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/save`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to save session');
+  }
+}
+
+export async function playerAction(
+  sessionId: number,
+  action: PlayerActionRequest
+): Promise<PlayerActionResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/action`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(action),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Failed to process action' }));
+    throw new Error(error.detail || 'Failed to process action');
+  }
+
+  return response.json();
+}
+
+export async function deleteSession(sessionId: number): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete session');
+  }
+}
+
+// ============================================================================
+// Dungeon Master API
+// ============================================================================
+
+export interface SceneNarration {
+  narration: string;
+  environmental_details: string[];
+  mood: string;
+}
+
+export async function narrateScene(
+  sessionId: number,
+  location?: string
+): Promise<SceneNarration> {
+  const response = await fetch(`${API_BASE_URL}/api/dm/narrate-scene`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ session_id: sessionId, location }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to get scene narration');
+  }
+
+  return response.json();
+}
+
+export async function getSceneNarrationAudio(
+  sessionId: number,
+  location?: string
+): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/api/dm/narrate-scene/audio`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ session_id: sessionId, location }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to get audio narration');
+  }
+
+  return response.blob();
+}
+
+export async function getMonsterStatBlock(
+  monsterName: string,
+  monsterData: Monster
+): Promise<{ monster_name: string; stat_block: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/monster-stat-block/${encodeURIComponent(monsterName)}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(monsterData),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(error.detail || `Failed to get stat block: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
