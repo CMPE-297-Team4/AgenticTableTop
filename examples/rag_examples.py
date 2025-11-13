@@ -4,20 +4,29 @@ RAG Integration Quick Start Examples
 This script provides copy-paste examples for using RAG features.
 """
 
+import sys
+from pathlib import Path
+
+# Add src/ to Python path so we can import modules directly
+src_path = Path(__file__).parent.parent / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
 # =============================================================================
 # EXAMPLE 1: Simple RAG-Augmented Campaign Generation
 # =============================================================================
 
+
 def example_basic_rag_campaign():
     """Generate a campaign with RAG-augmented content."""
-    from utils.model import initialize_llm
-    from utils.state import GameStatus
-    from utils.agents import (
+    from core.agents import (
         background_story_with_rag,
         generate_game_plan_with_rag,
         generate_quests_for_act_with_rag,
     )
-    from utils.rag_service import get_rag_service
+    from core.model import initialize_llm
+    from core.state import GameStatus
+    from services.rag import get_rag_service
 
     # Initialize
     model = initialize_llm()
@@ -46,9 +55,10 @@ def example_basic_rag_campaign():
 # EXAMPLE 2: Build Knowledge Base from PDFs
 # =============================================================================
 
+
 def example_build_knowledge_base():
     """Upload PDFs to create a knowledge base."""
-    from utils.rag_service import RAGService
+    from services.rag import RAGService
 
     rag = RAGService()
 
@@ -91,9 +101,10 @@ def example_build_knowledge_base():
 # EXAMPLE 3: Query Knowledge Base Directly
 # =============================================================================
 
+
 def example_query_knowledge_base():
     """Retrieve context from knowledge base."""
-    from utils.rag_service import RAGService
+    from services.rag import RAGService
 
     rag = RAGService()
     rag.ensure_index("agentic-tabletop")
@@ -124,9 +135,10 @@ def example_query_knowledge_base():
 # EXAMPLE 4: Manage Namespaces
 # =============================================================================
 
+
 def example_manage_namespaces():
     """Create and manage different knowledge namespaces."""
-    from utils.rag_service import RAGService
+    from services.rag import RAGService
 
     rag = RAGService()
     rag.ensure_index("agentic-tabletop")
@@ -153,11 +165,12 @@ def example_manage_namespaces():
 # EXAMPLE 5: Standard Campaign Generation (No RAG)
 # =============================================================================
 
+
 def example_standard_campaign():
     """Generate a campaign without RAG (original functionality)."""
-    from utils.model import initialize_llm
-    from utils.state import GameStatus
-    from utils.agents import background_story, generate_game_plan, generate_quests_for_act
+    from core.agents import background_story, generate_game_plan, generate_quests_for_act
+    from core.model import initialize_llm
+    from core.state import GameStatus
 
     # Initialize
     model = initialize_llm()
@@ -181,16 +194,14 @@ def example_standard_campaign():
 # EXAMPLE 6: Mixed RAG/Non-RAG (Selective RAG)
 # =============================================================================
 
+
 def example_selective_rag():
     """Use RAG for some steps, regular generation for others."""
-    from utils.model import initialize_llm
-    from utils.state import GameStatus
-    from utils.agents import (
-        background_story_with_rag,
-        generate_game_plan,  # No RAG
-        generate_quests_for_act_with_rag,
-    )
-    from utils.rag_service import get_rag_service
+    from core.agents import generate_game_plan  # No RAG
+    from core.agents import background_story_with_rag, generate_quests_for_act_with_rag
+    from core.model import initialize_llm
+    from core.state import GameStatus
+    from services.rag import get_rag_service
 
     # Initialize
     model = initialize_llm()

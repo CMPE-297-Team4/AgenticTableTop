@@ -42,7 +42,7 @@ Use AI to generate complete D&D campaign content automatically. Instead of spend
 
 ### Phase 1: Content Generation (COMPLETED)
 
-Running `python main.py` generates:
+Using the Web UI or API generates:
 
 #### 1. Background Story
 A rich campaign setting with:

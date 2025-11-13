@@ -1,30 +1,33 @@
+# Load config.yaml from project root (one level up from src/)
 import re
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import yaml
 
-from utils.prompt import (
+from core.prompt import (
     game_plan_prompt,
     monster_generation_prompt,
     quest_generation_prompt,
     storyteller_prompt,
 )
-from utils.rag_prompts import (
+from core.rag_prompts import (
     rag_game_plan_prompt,
     rag_quest_generation_prompt,
     rag_storyteller_prompt,
 )
-from utils.tools import (
+from services.trajectory import TrajectoryLogger
+from tools.utils import (
     get_total_tokens,
     parse_acts_result,
     parse_monster_result,
     parse_quests_result,
     parse_storyteller_result,
 )
-from utils.trajectory_logger import TrajectoryLogger
 
-with open("config.yaml", "r") as f:
+config_path = Path(__file__).parent.parent.parent.parent / "config.yaml"
+with open(config_path, "r") as f:
     config = yaml.safe_load(f)
 
 background_story_outline = config["BackgroundStoryOutline"]
@@ -480,7 +483,7 @@ def generate_monsters_for_combat_quests(
 
                     # Optionally: Add to monster registry for easy lookup
                     # Uncomment if you want to use the registry:
-                    # from utils.schemas import MonsterRegistry, Monster
+                    # from schemas.models import MonsterRegistry, Monster
                     # if "monster_registry" not in state:
                     #     state["monster_registry"] = MonsterRegistry()
                     # monster_objects = [Monster.model_validate(m) for m in monsters]

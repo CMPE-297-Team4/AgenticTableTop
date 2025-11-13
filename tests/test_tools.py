@@ -1,8 +1,8 @@
 """
-Unit tests for utils/tools.py
+Unit tests for tools/utils.py
 """
 
-from utils.tools import (
+from tools.utils import (
     dice_roll,
     get_total_tokens,
     parse_acts_result,

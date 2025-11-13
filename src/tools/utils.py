@@ -3,7 +3,7 @@ import random
 import re
 from typing import Any, Dict, List, Optional
 
-from utils.state import PlayerCharacter
+from core.state import PlayerCharacter
 
 
 def extract_json_from_response(response: str) -> Optional[str]:
@@ -448,7 +448,7 @@ def parse_monster_result(response):
 
     try:
         # Import Pydantic schema
-        from utils.schemas import Monster, MonsterGenerationResponse
+        from schemas.models import Monster, MonsterGenerationResponse
 
         # Extract JSON from response
         json_str = extract_json_from_response(response)
@@ -1015,7 +1015,7 @@ def run_combat_from_quest(
     Returns:
         Dictionary with combat results, or None if monster not found
     """
-    from utils.combat_system import run_simple_encounter
+    from combat.system import run_simple_encounter
 
     # Load monster from quest
     monster_data = load_monster_from_quest(state, quest_name, monster_index)

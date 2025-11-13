@@ -53,7 +53,7 @@ This document summarizes the testing infrastructure and development tools that h
 
 ### Test Breakdown
 
-#### utils/tools.py (14 tests)
+#### src/tools/utils.py (14 tests)
 - `parse_storyteller_result()`: 5 tests
   - Valid JSON with code blocks
   - Valid JSON without code blocks
@@ -69,7 +69,7 @@ This document summarizes the testing infrastructure and development tools that h
   - d20, d6, d4, d100 range validation
   - Statistical distribution check
 
-#### utils/agents.py (10 tests)
+#### src/core/agents.py (10 tests)
 - `background_story()`: 5 tests
   - Success return value
   - State title update
@@ -83,7 +83,7 @@ This document summarizes the testing infrastructure and development tools that h
   - State acts update
   - LLM invocation
 
-#### utils/model.py (5 tests, skipped without dependencies)
+#### src/core/model.py (5 tests, skipped without dependencies)
 - `initialize_llm()`: 5 tests
   - OpenAI initialization
   - Gemini initialization
@@ -101,11 +101,11 @@ All Python files have been formatted with:
 - Trailing commas in multi-line structures
 
 ### Files Formatted
-- utils/agents.py
-- utils/model.py
-- utils/tools.py
-- utils/state.py
-- main.py
+- src/core/agents.py
+- src/core/model.py
+- src/tools/utils.py
+- src/core/state.py
+- api.py
 - All test files
 
 ## Developer Workflow
@@ -165,7 +165,7 @@ bash scripts/format.sh
 
 ### Future Enhancements
 1. Add CI/CD pipeline (GitHub Actions)
-2. Add test for main.py workflow
+2. Add test for API workflow
 3. Add performance benchmarks
 4. Add test data fixtures for common scenarios
 

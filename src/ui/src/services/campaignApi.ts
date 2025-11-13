@@ -701,11 +701,11 @@ export async function getMonsterStatBlock(
   monsterData: Monster
 ): Promise<{ monster_name: string; stat_block: string }> {
   const response = await fetch(`${API_BASE_URL}/api/monster-stat-block/${encodeURIComponent(monsterName)}`, {
-    method: 'GET',
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ monster_data: monsterData }),
+    body: JSON.stringify(monsterData),
   });
 
   if (!response.ok) {

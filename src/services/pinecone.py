@@ -338,9 +338,9 @@ class PineconeService:
                 "theme": match.metadata["theme"],
                 "created_at": match.metadata["created_at"],
                 "score": match.score,
-                "tags": match.metadata.get("tags", "").split(",")
-                if match.metadata.get("tags")
-                else [],
+                "tags": (
+                    match.metadata.get("tags", "").split(",") if match.metadata.get("tags") else []
+                ),
             }
             for match in results.matches
         ]

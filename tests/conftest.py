@@ -2,11 +2,18 @@
 Pytest configuration and shared fixtures.
 """
 
+import sys
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
 
-from utils.state import GameStatus
+# Add src/ to Python path so we can import modules directly
+src_path = Path(__file__).parent.parent / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+from core.state import GameStatus  # noqa: E402
 
 
 @pytest.fixture

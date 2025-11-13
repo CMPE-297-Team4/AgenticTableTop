@@ -48,8 +48,16 @@ fi
 # Test Pinecone connection (with selected interpreter)
 echo "🧪 Testing Pinecone connection..."
 python3 -c "
+import sys
 import os
-from utils.pinecone_service import pinecone_service
+from pathlib import Path
+
+# Add src/ to Python path
+src_path = Path('src')
+if str(src_path.absolute()) not in sys.path:
+    sys.path.insert(0, str(src_path.absolute()))
+
+from services.pinecone import pinecone_service
 
 if pinecone_service.index:
     print('✅ Pinecone connection successful!')
@@ -64,7 +72,7 @@ echo ""
 echo "Next steps:"
 echo "1. Edit .env file with your API keys"
 echo "2. Start the backend: python api.py"
-echo "3. Start the frontend: cd ui && npm run dev"
+echo "3. Start the frontend: cd src/ui && npm run dev"
 echo "4. Visit http://localhost:5173 and try generating a campaign with Pinecone storage!"
 echo ""
-echo "📚 For more information, see docs/PINECONE_INTEGRATION.md"
+echo "📚 For more information, see docs/RAG_SETUP.md"

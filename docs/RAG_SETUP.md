@@ -82,14 +82,14 @@ RAG:
 #### Option 1: Quick Start (Programmatic)
 
 ```python
-from utils.model import initialize_llm
-from utils.state import GameStatus
-from utils.agents import (
+from core.model import initialize_llm
+from core.state import GameStatus
+from core.agents import (
     background_story_with_rag,
     generate_game_plan_with_rag,
     generate_quests_for_act_with_rag,
 )
-from utils.rag_service import get_rag_service
+from services.rag import get_rag_service
 
 # Initialize
 model = initialize_llm()
@@ -113,7 +113,7 @@ for i in range(len(state["acts"])):
 Simply use the original functions without RAG:
 
 ```python
-from utils.agents import background_story, generate_game_plan, generate_quests_for_act
+from core.agents import background_story, generate_game_plan, generate_quests_for_act
 
 background_story(model, state)
 generate_game_plan(model, state)
@@ -135,7 +135,7 @@ for i in range(len(state["acts"])):
 #### 2. Upload PDFs to Pinecone
 
 ```python
-from utils.rag_service import RAGService
+from services.rag import RAGService
 
 rag = RAGService()
 
@@ -303,7 +303,7 @@ Generate quests for an act, augmented with knowledge.
 ### 1. Set Up Knowledge Base
 
 ```python
-from utils.rag_service import RAGService
+from services.rag import RAGService
 
 rag = RAGService()
 rag.ensure_index("agentic-tabletop")
@@ -326,9 +326,9 @@ rag.upsert_pdf_to_knowledge_base(
 ### 2. Generate Campaign with RAG
 
 ```python
-from utils.model import initialize_llm
-from utils.state import GameStatus
-from utils.agents import (
+from core.model import initialize_llm
+from core.state import GameStatus
+from core.agents import (
     background_story_with_rag,
     generate_game_plan_with_rag,
     generate_quests_for_act_with_rag,
@@ -393,7 +393,7 @@ Verify:
 
 ## Next Steps
 
-- Customize RAG prompts in `utils/rag_prompts.py`
+- Customize RAG prompts in `src/core/rag_prompts.py`
 - Adjust chunk size/stride in `config.yaml` for different PDF types
 - Create multiple indexes for different campaign systems (D&D, Pathfinder, etc.)
 - Integrate character image generation with RAG context

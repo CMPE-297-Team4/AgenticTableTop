@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from utils.tools import dice_roll
+from tools.utils import dice_roll
 
 
 class CombatStatus(Enum):

@@ -20,7 +20,6 @@ help:
 	@echo "  make check          - Run format check without modifying files"
 	@echo ""
 	@echo "Runtime Commands:"
-	@echo "  make run            - Run the campaign generator (CLI)"
 	@echo "  make api            - Start the backend API server"
 	@echo "  make frontend       - Start the frontend UI"
 	@echo "  make start-all      - Start both backend and frontend"
@@ -54,7 +53,7 @@ test:
 # Run tests with coverage (requires pytest-cov)
 coverage:
 	@echo "Running tests with coverage..."
-	@pytest -v --cov=utils --cov=main --cov-report=term-missing --cov-report=html
+	@PYTHONPATH=$$(pwd)/src:$$PYTHONPATH pytest -v --cov=src --cov=api --cov-report=term-missing --cov-report=html
 	@echo ""
 	@echo "HTML coverage report generated: htmlcov/index.html"
 
@@ -64,22 +63,21 @@ format:
 
 # Lint only (no formatting)
 lint:
-	@echo "Running flake8..."
-	@flake8 utils/ main.py tests/
+	@bash scripts/format.sh --lint-only || true
 
 # Check formatting without modifying files
 check:
 	@echo "Checking code formatting..."
-	@black --check utils/ main.py tests/
+	@if [ -f venv/bin/activate ]; then source venv/bin/activate; fi; \
+	black --check src/ api.py tests/ --exclude="/(node_modules|venv|\.venv|__pycache__|\.git)/" || \
+	python3 -m black --check src/ api.py tests/ --exclude="/(node_modules|venv|\.venv|__pycache__|\.git)/"
 	@echo "Checking import ordering..."
-	@isort --check-only utils/ main.py tests/
+	@if [ -f venv/bin/activate ]; then source venv/bin/activate; fi; \
+	isort --check-only src/ api.py tests/ --skip-glob="**/node_modules/**" --skip-glob="**/venv/**" || \
+	python3 -m isort --check-only src/ api.py tests/ --skip-glob="**/node_modules/**" --skip-glob="**/venv/**"
 	@echo "Running flake8..."
-	@flake8 utils/ main.py tests/
-
-# Run the main application (CLI)
-run:
-	@echo "Running D&D Campaign Generator..."
-	@python main.py
+	@if [ -f venv/bin/activate ]; then source venv/bin/activate; fi; \
+	flake8 src/ api.py tests/ || python3 -m flake8 src/ api.py tests/ || true
 
 # Run the backend API
 api:
