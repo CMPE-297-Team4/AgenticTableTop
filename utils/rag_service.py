@@ -4,16 +4,15 @@ Integrates Pinecone vector database with OpenAI embeddings for knowledge-based g
 """
 
 import os
-import time
 import re
 import textwrap
-from typing import Optional, List
+import time
+from typing import List, Optional
 
+import fitz  # PyMuPDF (binary version)
 from dotenv import load_dotenv
 from openai import OpenAI
 from pinecone import Pinecone, ServerlessSpec
-import fitz  # PyMuPDF (binary version)
-
 
 # Load environment variables
 load_dotenv()
@@ -44,9 +43,7 @@ class RAGService:
         self.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
 
         if not self.pinecone_api_key or not self.openai_api_key:
-            raise ValueError(
-                "Please set PINECONE_API_KEY and OPENAI_API_KEY environment variables"
-            )
+            raise ValueError("Please set PINECONE_API_KEY and OPENAI_API_KEY environment variables")
 
         self.client = OpenAI(api_key=self.openai_api_key)
         self.pc = Pinecone(api_key=self.pinecone_api_key)
@@ -160,9 +157,7 @@ class RAGService:
         if not os.path.exists(pdf_path):
             raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
-        doc_id_prefix = doc_id_prefix or os.path.splitext(
-            os.path.basename(pdf_path)
-        )[0]
+        doc_id_prefix = doc_id_prefix or os.path.splitext(os.path.basename(pdf_path))[0]
 
         print(f"Extracting text from {pdf_path}...")
         doc_lines = self.extract_clean_text_from_pdf(pdf_path)
@@ -193,9 +188,7 @@ class RAGService:
                 count += 1
                 vector_id = f"{doc_id_prefix}_{count}"
                 self.index.upsert(
-                    vectors=[
-                        {"id": vector_id, "metadata": metadata, "values": embed}
-                    ],
+                    vectors=[{"id": vector_id, "metadata": metadata, "values": embed}],
                     namespace=namespace,
                 )
 

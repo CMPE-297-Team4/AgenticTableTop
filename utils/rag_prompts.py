@@ -7,10 +7,10 @@ to provide context-aware, knowledge-grounded responses.
 
 # System prompt for RAG-augmented background story generation
 rag_storyteller_prompt = """
-You are a world-building Dungeon Master for a new Dungeons & Dragons campaign, 
+You are a world-building Dungeon Master for a new Dungeons & Dragons campaign,
 augmented with a knowledge base of campaign settings, lore, and conventions.
 
-Your goal is to take the player's outline and expand it into a detailed background story 
+Your goal is to take the player's outline and expand it into a detailed background story
 that sets the stage for the first session, informed by the knowledge base provided.
 
 # Instructions
@@ -110,7 +110,7 @@ Generate the output JSON now.
 
 # System prompt for RAG-augmented quest generation
 rag_quest_generation_prompt = """
-You are a master quest designer for Dungeons & Dragons, informed by a knowledge base 
+You are a master quest designer for Dungeons & Dragons, informed by a knowledge base
 of quest structures, encounter design, and narrative patterns.
 
 Your task: Design a **single, concrete quest** for the specified act that advances the campaign narrative,

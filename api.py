@@ -8,34 +8,48 @@ import traceback
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr
-from sqlalchemy.orm import Session
 
 # Load environment variables from .env file
 load_dotenv()
 
-from utils.agents import background_story, generate_game_plan, generate_quests_for_act
-from utils.character_generator import generate_npc_portrait
-from utils.llm_cache import (
+# Imports after load_dotenv() need environment variables to be loaded first
+from fastapi import Depends, FastAPI, HTTPException, status  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm  # noqa: E402
+from pydantic import BaseModel, EmailStr  # noqa: E402
+from sqlalchemy.orm import Session  # noqa: E402
+
+from utils.agents import (  # noqa: E402
+    background_story,
+    generate_game_plan,
+    generate_monsters_for_quest,
+    generate_quests_for_act,
+)
+from utils.auth import (  # noqa: E402
+    create_access_token,
+    decode_access_token,
+    get_password_hash,
+    verify_password,
+)
+from utils.character_generator import generate_npc_portrait  # noqa: E402
+from utils.combat_system import (  # noqa: E402
+    CombatEncounter,
+    create_combatant_from_monster,
+    create_player_combatant,
+    simulate_attack,
+)
+from utils.database import Campaign, NPCImage, User, get_db, init_db  # noqa: E402
+from utils.llm_cache import (  # noqa: E402
     cache_response,
     cleanup_expired_cache,
     clear_llm_cache,
     get_cache_stats,
     get_cached_response,
 )
-from utils.model import initialize_llm
-from utils.state import GameStatus
-from utils.pinecone_service import pinecone_service
-from utils.database import Campaign, NPCImage, SessionLocal, User, get_db, init_db
-from utils.auth import (
-    create_access_token,
-    decode_access_token,
-    get_password_hash,
-    verify_password,
-)
+from utils.model import initialize_llm  # noqa: E402
+from utils.pinecone_service import pinecone_service  # noqa: E402
+from utils.state import GameStatus  # noqa: E402
+from utils.tools import get_monster_stat_block  # noqa: E402
 
 # Constants
 DEFAULT_CAMPAIGN_TITLE = "Untitled Campaign"
@@ -95,7 +109,7 @@ class StoryResponse(BaseModel):
 
 class SaveCampaignRequest(BaseModel):
     """Request model for saving campaign to Pinecone"""
-    
+
     campaign_data: CampaignResponse
     user_id: Optional[str] = None
     tags: Optional[List[str]] = []
@@ -103,7 +117,7 @@ class SaveCampaignRequest(BaseModel):
 
 class SearchRequest(BaseModel):
     """Request model for searching campaigns"""
-    
+
     query: str
     user_id: Optional[str] = None
     limit: Optional[int] = 10
@@ -111,9 +125,11 @@ class SearchRequest(BaseModel):
 
 class SearchResponse(BaseModel):
     """Response model for search results"""
-    
+
     results: List[Dict[str, Any]]
     total: int
+
+
 class NPCImageRequest(BaseModel):
     """Request model for NPC image generation"""
 
@@ -164,6 +180,47 @@ class NPCImageResponse(BaseModel):
     prompt_used: str
 
 
+class MonsterGenerationRequest(BaseModel):
+    """Request model for monster generation"""
+
+    quest_name: str
+    quest_description: str
+    quest_type: str
+    difficulty: str = "Medium"
+    locations: List[str] = []
+    objectives: List[str] = []
+    quest_context: Optional[str] = None
+
+
+class MonsterResponse(BaseModel):
+    """Response model for monster generation"""
+
+    quest_name: str
+    monsters: List[Dict[str, Any]]
+
+
+class CombatRequest(BaseModel):
+    """Request model for combat simulation"""
+
+    player_name: str
+    player_max_hp: int
+    player_armor_class: int
+    player_dexterity_modifier: int
+    monster_name: str
+    monster_data: Dict[str, Any]
+
+
+class CombatResponse(BaseModel):
+    """Response model for combat simulation"""
+
+    combat_log: List[str]
+    result: str
+    player_hp: int
+    monster_hp: int
+    round: int
+    current_turn: str
+
+
 @app.get("/")
 async def root():
     """Root endpoint"""
@@ -180,25 +237,25 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     payload = decode_access_token(token)
     if payload is None:
         raise credentials_exception
-    
+
     user_id_str: str = payload.get("sub")
     if user_id_str is None:
         raise credentials_exception
-    
+
     # Convert string user_id to int
     try:
         user_id: int = int(user_id_str)
     except (ValueError, TypeError):
         raise credentials_exception
-    
+
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
-    
+
     return user
 
 
@@ -212,17 +269,17 @@ def get_current_user_optional(
         payload = decode_access_token(token)
         if payload is None:
             return None
-        
+
         user_id_str: str = payload.get("sub")
         if user_id_str is None:
             return None
-        
+
         # Convert string user_id to int
         try:
             user_id: int = int(user_id_str)
         except (ValueError, TypeError):
             return None
-        
+
         user = db.query(User).filter(User.id == user_id).first()
         return user
     except Exception:
@@ -245,7 +302,7 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already registered",
         )
-    
+
     # Check if email already exists
     existing_email = db.query(User).filter(User.email == user_data.email).first()
     if existing_email:
@@ -253,7 +310,7 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
         )
-    
+
     # Create new user
     hashed_password = get_password_hash(user_data.password)
     new_user = User(
@@ -261,11 +318,11 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
         email=user_data.email,
         hashed_password=hashed_password,
     )
-    
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    
+
     return UserResponse(
         id=new_user.id,
         username=new_user.username,
@@ -275,29 +332,27 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
 
 
 @app.post("/api/auth/login", response_model=Token)
-async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
-):
+async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """Login and get access token"""
     # Find user by username
     user = db.query(User).filter(User.username == form_data.username).first()
-    
+
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is inactive",
         )
-    
+
     # Create access token (sub must be a string)
     access_token = create_access_token(data={"sub": str(user.id)})
-    
+
     return Token(
         access_token=access_token,
         token_type="bearer",
@@ -388,7 +443,9 @@ async def generate_campaign(
         if cache_enabled and not request.force_new:
             cached_response = get_cached_response(cache_key, "campaign")
             if cached_response:
-                print(f"Returning cached campaign for user {user_id_str}: {request.outline[:50]}...")
+                print(
+                    f"Returning cached campaign for user {user_id_str}: {request.outline[:50]}..."
+                )
                 return CampaignResponse(**cached_response)
 
         print(f"Generating new campaign for: {request.outline[:50]}...")
@@ -462,46 +519,51 @@ async def generate_campaign(
         if cache_enabled:
             cache_response(cache_key, campaign_response.dict(), "campaign")
             print(f"Cached campaign response for: {request.outline[:50]}...")
-        
+
         # Generate campaign ID (use Pinecone ID if saved, otherwise generate UUID)
         campaign_id = None
-        
+
         # Always save to database for user
         import json
+
         campaign_db = Campaign(
             user_id=current_user.id,
             title=campaign_response.title,
             background=campaign_response.background,
             theme=campaign_response.theme,
-            campaign_data=json.dumps(campaign_response.dict())
+            campaign_data=json.dumps(campaign_response.dict()),
         )
         db.add(campaign_db)
         db.commit()
         db.refresh(campaign_db)
         campaign_id = str(campaign_db.id)
         print(f"Campaign saved to database with ID: {campaign_id}")
-        
+
         # Optionally save to Pinecone if requested
         if request.save_to_pinecone:
             try:
                 pinecone_id = pinecone_service.store_campaign(
                     campaign_data=campaign_response.dict(),
                     user_id=request.user_id or str(current_user.id),
-                    tags=request.tags or []
+                    tags=request.tags or [],
                 )
                 print(f"Campaign also saved to Pinecone with ID: {pinecone_id}")
             except Exception as e:
                 print(f"Warning: Failed to save campaign to Pinecone: {e}")
                 # Don't fail the request if Pinecone save fails
-        
+
         return campaign_response
     except Exception as e:
         error_str = str(e)
         print(f"Error generating campaign: {error_str}")
         print(traceback.format_exc())
-        
+
         # Check for OpenAI quota/rate limit errors
-        if "quota" in error_str.lower() or "insufficient_quota" in error_str.lower() or "429" in error_str:
+        if (
+            "quota" in error_str.lower()
+            or "insufficient_quota" in error_str.lower()
+            or "429" in error_str
+        ):
             gemini_available = os.getenv("GEMINI_API_KEY", "")
             error_detail = (
                 "OpenAI API quota exceeded. Please check your billing and usage limits at "
@@ -517,11 +579,8 @@ async def generate_campaign(
                     "To use Gemini as an alternative, add GEMINI_API_KEY to your .env file and set "
                     "MODEL_TYPE=GEMINI in utils/model.py"
                 )
-            raise HTTPException(
-                status_code=402,  # Payment Required
-                detail=error_detail
-            )
-        
+            raise HTTPException(status_code=402, detail=error_detail)  # Payment Required
+
         # Check for rate limit errors (429)
         if "rate limit" in error_str.lower() or "429" in error_str:
             raise HTTPException(
@@ -529,9 +588,9 @@ async def generate_campaign(
                 detail=(
                     "API rate limit exceeded. Please wait a moment and try again. "
                     "If this persists, check your API usage limits."
-                )
+                ),
             )
-        
+
         raise HTTPException(status_code=500, detail=f"Failed to generate campaign: {error_str}")
 
 
@@ -658,42 +717,42 @@ async def save_campaign(
 ):
     """
     Save a generated campaign to database and optionally Pinecone
-    
+
     This endpoint stores the campaign data for future retrieval
     """
     try:
         import json
-        
+
         # Save to database
         campaign_db = Campaign(
             user_id=current_user.id,
             title=request.campaign_data.title,
             background=request.campaign_data.background,
             theme=request.campaign_data.theme,
-            campaign_data=json.dumps(request.campaign_data.dict())
+            campaign_data=json.dumps(request.campaign_data.dict()),
         )
         db.add(campaign_db)
         db.commit()
         db.refresh(campaign_db)
-        
+
         campaign_id = str(campaign_db.id)
-        
+
         # Optionally save to Pinecone if requested
         if request.user_id or request.tags:
             try:
                 pinecone_id = pinecone_service.store_campaign(
                     campaign_data=request.campaign_data.dict(),
                     user_id=request.user_id or str(current_user.id),
-                    tags=request.tags or []
+                    tags=request.tags or [],
                 )
                 print(f"Campaign also saved to Pinecone with ID: {pinecone_id}")
             except Exception as e:
                 print(f"Warning: Failed to save to Pinecone: {e}")
-        
+
         return {
             "success": True,
             "campaign_id": campaign_id,
-            "message": "Campaign saved successfully"
+            "message": "Campaign saved successfully",
         }
     except Exception as e:
         print(f"Error saving campaign: {str(e)}")
@@ -710,16 +769,21 @@ async def list_user_campaigns(
     List all campaigns for the current user
     """
     try:
-        campaigns = db.query(Campaign).filter(
-            Campaign.user_id == current_user.id
-        ).order_by(Campaign.created_at.desc()).all()
-        
+        campaigns = (
+            db.query(Campaign)
+            .filter(Campaign.user_id == current_user.id)
+            .order_by(Campaign.created_at.desc())
+            .all()
+        )
+
         return [
             {
                 "id": camp.id,
                 "title": camp.title,
                 "theme": camp.theme,
-                "background": camp.background[:200] + "..." if camp.background and len(camp.background) > 200 else camp.background,
+                "background": camp.background[:200] + "..."
+                if camp.background and len(camp.background) > 200
+                else camp.background,
                 "created_at": camp.created_at.isoformat() if camp.created_at else None,
                 "updated_at": camp.updated_at.isoformat() if camp.updated_at else None,
             }
@@ -742,21 +806,19 @@ async def get_user_campaign(
     """
     try:
         import json
-        
-        campaign = db.query(Campaign).filter(
-            Campaign.id == campaign_id,
-            Campaign.user_id == current_user.id
-        ).first()
-        
+
+        campaign = (
+            db.query(Campaign)
+            .filter(Campaign.id == campaign_id, Campaign.user_id == current_user.id)
+            .first()
+        )
+
         if not campaign:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Campaign not found"
-            )
-        
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
         # Parse campaign data
         campaign_data = json.loads(campaign.campaign_data) if campaign.campaign_data else {}
-        
+
         return campaign_data
     except HTTPException:
         raise
@@ -770,20 +832,15 @@ async def get_user_campaign(
 async def search_campaigns(request: SearchRequest):
     """
     Search for campaigns using vector similarity
-    
+
     This endpoint allows finding campaigns based on semantic similarity to the query
     """
     try:
         results = pinecone_service.search_campaigns(
-            query=request.query,
-            user_id=request.user_id,
-            limit=request.limit
+            query=request.query, user_id=request.user_id, limit=request.limit
         )
-        
-        return SearchResponse(
-            results=results,
-            total=len(results)
-        )
+
+        return SearchResponse(results=results, total=len(results))
     except Exception as e:
         print(f"Error searching campaigns: {str(e)}")
         print(traceback.format_exc())
@@ -794,19 +851,13 @@ async def search_campaigns(request: SearchRequest):
 async def search_quests(request: SearchRequest):
     """
     Search for quests using vector similarity
-    
+
     This endpoint allows finding quests based on semantic similarity to the query
     """
     try:
-        results = pinecone_service.search_quests(
-            query=request.query,
-            limit=request.limit
-        )
-        
-        return SearchResponse(
-            results=results,
-            total=len(results)
-        )
+        results = pinecone_service.search_quests(query=request.query, limit=request.limit)
+
+        return SearchResponse(results=results, total=len(results))
     except Exception as e:
         print(f"Error searching quests: {str(e)}")
         print(traceback.format_exc())
@@ -817,15 +868,15 @@ async def search_quests(request: SearchRequest):
 async def get_campaign(campaign_id: str):
     """
     Retrieve a specific campaign by ID
-    
+
     This endpoint fetches campaign metadata from Pinecone
     """
     try:
         campaign = pinecone_service.get_campaign_by_id(campaign_id)
-        
+
         if not campaign:
             raise HTTPException(status_code=404, detail="Campaign not found")
-        
+
         return campaign
     except HTTPException:
         raise
@@ -839,19 +890,16 @@ async def get_campaign(campaign_id: str):
 async def delete_campaign(campaign_id: str):
     """
     Delete a campaign and all related data
-    
+
     This endpoint removes the campaign and its quests from Pinecone
     """
     try:
         success = pinecone_service.delete_campaign(campaign_id)
-        
+
         if not success:
             raise HTTPException(status_code=500, detail="Failed to delete campaign")
-        
-        return {
-            "success": True,
-            "message": "Campaign deleted successfully"
-        }
+
+        return {"success": True, "message": "Campaign deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
@@ -881,18 +929,18 @@ async def generate_npc_image(
     try:
         # First, check database for existing image
         query = db.query(NPCImage).filter(NPCImage.npc_name == request.npc_name)
-        
+
         # If user is authenticated, prefer their images
         if current_user:
             query = query.filter(NPCImage.user_id == current_user.id)
-        
+
         # If campaign_id provided, filter by it
         if request.campaign_id:
             query = query.filter(NPCImage.campaign_id == request.campaign_id)
-        
+
         # Try to find matching image (by name and similar description)
         existing_image = query.first()
-        
+
         if existing_image:
             print(f"Returning stored NPC image from database for: {request.npc_name}")
             return NPCImageResponse(
@@ -900,7 +948,7 @@ async def generate_npc_image(
                 image_base64=existing_image.image_base64,
                 prompt_used=existing_image.prompt_used or "",
             )
-        
+
         # Check if caching is enabled (fallback to LLM cache)
         cache_enabled = os.environ.get("LLM_CACHE_ENABLED", "true").lower() == "true"
 
@@ -952,16 +1000,20 @@ async def generate_npc_image(
         db.add(new_image)
         db.commit()
         db.refresh(new_image)
-        
+
         print(f"Saved NPC image to database (ID: {new_image.id})")
 
         # Cache the response if caching is enabled
         if cache_enabled:
-            cache_response(cache_key, {
-                "npc_name": result["npc_name"],
-                "image_base64": result["image_base64"],
-                "prompt_used": result.get("prompt_used", ""),
-            }, "npc_image")
+            cache_response(
+                cache_key,
+                {
+                    "npc_name": result["npc_name"],
+                    "image_base64": result["image_base64"],
+                    "prompt_used": result.get("prompt_used", ""),
+                },
+                "npc_image",
+            )
 
         return NPCImageResponse(
             npc_name=result["npc_name"],
@@ -984,7 +1036,7 @@ async def list_npc_images(
 ):
     """
     List NPC images from database
-    
+
     Returns stored NPC images filtered by:
     - campaign_id (optional)
     - npc_name (optional)
@@ -992,21 +1044,21 @@ async def list_npc_images(
     """
     try:
         query = db.query(NPCImage)
-        
+
         # Filter by user if authenticated
         if current_user:
             query = query.filter(NPCImage.user_id == current_user.id)
-        
+
         # Filter by campaign if provided
         if campaign_id:
             query = query.filter(NPCImage.campaign_id == campaign_id)
-        
+
         # Filter by NPC name if provided
         if npc_name:
             query = query.filter(NPCImage.npc_name.ilike(f"%{npc_name}%"))
-        
+
         images = query.order_by(NPCImage.created_at.desc()).all()
-        
+
         return [
             {
                 "id": img.id,
@@ -1034,28 +1086,28 @@ async def get_npc_image(
 ):
     """
     Get a specific NPC image by name
-    
+
     Returns the stored image if found in database
     """
     try:
         query = db.query(NPCImage).filter(NPCImage.npc_name == npc_name)
-        
+
         # If user is authenticated, prefer their images
         if current_user:
             query = query.filter(NPCImage.user_id == current_user.id)
-        
+
         # If campaign_id provided, filter by it
         if campaign_id:
             query = query.filter(NPCImage.campaign_id == campaign_id)
-        
+
         image = query.first()
-        
+
         if not image:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"NPC image not found for: {npc_name}",
             )
-        
+
         return NPCImageResponse(
             npc_name=image.npc_name,
             image_base64=image.image_base64,
@@ -1077,28 +1129,28 @@ async def delete_npc_image(
 ):
     """
     Delete an NPC image
-    
+
     Only the owner can delete their images
     """
     try:
         image = db.query(NPCImage).filter(NPCImage.id == image_id).first()
-        
+
         if not image:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="NPC image not found",
             )
-        
+
         # Check if user owns this image
         if image.user_id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You don't have permission to delete this image",
             )
-        
+
         db.delete(image)
         db.commit()
-        
+
         return {"success": True, "message": "NPC image deleted successfully"}
     except HTTPException:
         raise
@@ -1106,6 +1158,149 @@ async def delete_npc_image(
         print(f"Error deleting NPC image: {str(e)}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Failed to delete NPC image: {str(e)}")
+
+
+@app.post("/api/generate-monsters", response_model=MonsterResponse)
+async def generate_monsters(request: MonsterGenerationRequest):
+    """
+    Generate monsters for a specific combat quest
+    """
+    try:
+        # Check if caching is enabled
+        cache_enabled = os.environ.get("LLM_CACHE_ENABLED", "true").lower() == "true"
+
+        # Create cache key from request
+        cache_key = f"monsters:{request.quest_name}:{request.difficulty}"
+
+        # Try to get cached response
+        if cache_enabled:
+            cached_response = get_cached_response(cache_key, "monsters")
+            if cached_response:
+                print(f"Returning cached monsters for: {request.quest_name}")
+                return MonsterResponse(**cached_response)
+
+        print(f"Generating new monsters for: {request.quest_name}")
+
+        # Initialize LLM
+        model = initialize_llm()
+
+        # Create quest dictionary
+        quest = {
+            "quest_name": request.quest_name,
+            "description": request.quest_description,
+            "quest_type": request.quest_type,
+            "difficulty": request.difficulty,
+            "locations": request.locations,
+            "objectives": request.objectives,
+        }
+
+        # Generate monsters
+        monsters = generate_monsters_for_quest(model, quest, request.quest_context)
+
+        # Create response
+        response_data = {"quest_name": request.quest_name, "monsters": monsters}
+
+        # Cache the response if caching is enabled
+        if cache_enabled:
+            cache_response(cache_key, response_data, "monsters")
+            print(f"Cached monster response for: {request.quest_name}")
+
+        return MonsterResponse(**response_data)
+
+    except Exception as e:
+        print(f"Error generating monsters: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to generate monsters: {str(e)}")
+
+
+@app.post("/api/simulate-combat", response_model=CombatResponse)
+async def simulate_combat(request: CombatRequest):
+    """
+    Simulate a combat encounter between a player and a monster
+    """
+    try:
+        print(f"Simulating combat: {request.player_name} vs {request.monster_name}")
+
+        # Create player combatant
+        player = create_player_combatant(
+            name=request.player_name,
+            max_hp=request.player_max_hp,
+            armor_class=request.player_armor_class,
+            dexterity_modifier=request.player_dexterity_modifier,
+        )
+
+        # Create monster combatant
+        monster = create_combatant_from_monster(request.monster_data, request.monster_name)
+
+        # Create combat encounter
+        encounter = CombatEncounter([player, monster])
+        encounter.start_combat()
+
+        # Simulate a few rounds of combat
+        max_rounds = 10
+        round_count = 0
+
+        while not encounter.is_combat_over() and round_count < max_rounds:
+            current_combatant = encounter.get_current_combatant()
+
+            if current_combatant == player:
+                # Player attacks monster
+                # For now, use a simple attack (1d20 + 3, 1d8 + 1 damage)
+                attack_result = simulate_attack(player, monster, 3, "1d8", 1)
+                encounter.add_combat_log(attack_result["message"])
+            else:
+                # Monster attacks player
+                # Use monster's first action if available
+                actions = request.monster_data.get("actions", [])
+                if actions:
+                    action = actions[0]
+                    attack_bonus = action.get("attack_bonus", 0)
+                    damage_dice = action.get("damage", "1d6")
+                    damage_bonus = 0  # Could extract from damage string
+
+                    attack_result = simulate_attack(
+                        monster, player, attack_bonus, damage_dice, damage_bonus
+                    )
+                    encounter.add_combat_log(attack_result["message"])
+                else:
+                    # Fallback attack
+                    attack_result = simulate_attack(monster, player, 3, "1d6", 0)
+                    encounter.add_combat_log(attack_result["message"])
+
+            encounter.next_turn()
+            round_count += 1
+
+        # Get final result
+        result = encounter.get_combat_result()
+        current_combatant = encounter.get_current_combatant()
+        current_turn_name = current_combatant.name if current_combatant else "Unknown"
+
+        return CombatResponse(
+            combat_log=encounter.combat_log,
+            result=result,
+            player_hp=player.current_hp,
+            monster_hp=monster.current_hp,
+            round=encounter.round,
+            current_turn=current_turn_name,
+        )
+
+    except Exception as e:
+        print(f"Error simulating combat: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Failed to simulate combat: {str(e)}")
+
+
+@app.get("/api/monster-stat-block/{monster_name}")
+async def get_monster_stat_block_endpoint(monster_name: str, monster_data: Dict[str, Any]):
+    """
+    Get a formatted stat block for a monster
+    """
+    try:
+        stat_block = get_monster_stat_block(monster_data)
+        return {"monster_name": monster_name, "stat_block": stat_block}
+    except Exception as e:
+        print(f"Error generating stat block: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate stat block: {str(e)}")
 
 
 if __name__ == "__main__":

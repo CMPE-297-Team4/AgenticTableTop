@@ -7,17 +7,8 @@ Uses SQLite for development (can be switched to PostgreSQL for production).
 
 import os
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import (
-    Boolean,
-    Column,
-    DateTime,
-    Integer,
-    String,
-    Text,
-    create_engine,
-)
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -70,9 +61,7 @@ class NPCImage(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Index for faster lookups
-    __table_args__ = (
-        {"sqlite_autoincrement": True} if "sqlite" in DATABASE_URL else {},
-    )
+    __table_args__ = ({"sqlite_autoincrement": True} if "sqlite" in DATABASE_URL else {},)
 
 
 class Campaign(Base):
@@ -111,4 +100,3 @@ if __name__ == "__main__":
 else:
     # Auto-initialize on module import
     init_db()
-
