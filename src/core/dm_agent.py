@@ -19,7 +19,15 @@ from core.dm_prompts import (
     SCENE_NARRATION_PROMPT,
 )
 from core.model import initialize_llm
-from services.rag import get_rag_service
+
+# Optional RAG service import
+try:
+    from services.rag import get_rag_service
+
+    _rag_available = True
+except ImportError:
+    get_rag_service = None  # type: ignore
+    _rag_available = False
 
 
 class DungeonMasterAgent:
@@ -38,12 +46,15 @@ class DungeonMasterAgent:
         self.rag_namespace = rag_namespace or "campaign-rules"
         self.rag_service = None
 
-        if use_rag:
+        if use_rag and _rag_available:
             try:
                 self.rag_service = get_rag_service()
             except Exception as e:
                 print(f"Warning: RAG service not available: {e}")
                 self.use_rag = False
+        elif use_rag and not _rag_available:
+            print("Warning: RAG service dependencies not installed. RAG disabled.")
+            self.use_rag = False
 
     def _get_campaign_context(
         self, campaign_data: Dict[str, Any], quest: Optional[Dict[str, Any]] = None

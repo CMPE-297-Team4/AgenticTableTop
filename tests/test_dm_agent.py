@@ -62,11 +62,13 @@ class TestDungeonMasterAgent:
 
     def test_dm_agent_with_rag(self):
         """Test DM agent initialization with RAG"""
-        with patch("core.dm_agent.get_rag_service") as mock_rag:
-            mock_rag.return_value = Mock()
-            agent = DungeonMasterAgent(use_rag=True)
-            assert agent.use_rag is True
-            assert agent.rag_service is not None
+        # Mock the RAG availability check
+        with patch("core.dm_agent._rag_available", True):
+            with patch("core.dm_agent.get_rag_service") as mock_rag:
+                mock_rag.return_value = Mock()
+                agent = DungeonMasterAgent(use_rag=True)
+                assert agent.use_rag is True
+                assert agent.rag_service is not None
 
     @patch("core.dm_agent.initialize_llm")
     def test_narrate_scene(self, mock_init_llm, mock_model, sample_campaign_data):

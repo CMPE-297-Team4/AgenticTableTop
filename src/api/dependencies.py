@@ -49,7 +49,7 @@ async def get_current_user(
     return user
 
 
-def get_current_user_optional(
+async def get_current_user_optional(
     token: Optional[str] = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> Optional[User]:
     """Get current user if authenticated, otherwise return None"""

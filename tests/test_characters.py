@@ -20,74 +20,67 @@ def mock_openai_client():
 
         # Mock character generation response
         mock_response = Mock()
-        mock_response.choices = [
-            Mock(
-                message=Mock(
-                    tool_calls=[
-                        Mock(
-                            function=Mock(
-                                name="save_character",
-                                arguments=json.dumps(
-                                    {
-                                        "character": {
-                                            "character_name": "Test Character",
-                                            "player_name": "Test Player",
-                                            "class_and_level": "Fighter 1",
-                                            "race": "Human",
-                                            "background": "Soldier",
-                                            "alignment": "Lawful Good",
-                                            "experience_points": 0,
-                                            "abilities": {
-                                                "strength": 16,
-                                                "dexterity": 14,
-                                                "constitution": 15,
-                                                "intelligence": 10,
-                                                "wisdom": 12,
-                                                "charisma": 8,
-                                            },
-                                            "saving_throws": {
-                                                "strength": True,
-                                                "dexterity": False,
-                                                "constitution": True,
-                                                "intelligence": False,
-                                                "wisdom": False,
-                                                "charisma": False,
-                                            },
-                                            "skills": {
-                                                "athletics": True,
-                                                "perception": True,
-                                            },
-                                            "proficiency_bonus": 2,
-                                            "passive_wisdom": 11,
-                                            "combat_stats": {
-                                                "armor_class": 16,
-                                                "initiative": 2,
-                                                "speed": 30,
-                                                "hit_point_maximum": 12,
-                                                "current_hit_points": 12,
-                                                "temporary_hit_points": 0,
-                                                "hit_dice_total": "1d10",
-                                                "death_saves": {"successes": 0, "failures": 0},
-                                            },
-                                            "attacks_and_spellcasting": [],
-                                            "equipment": [],
-                                            "other_proficiencies_and_languages": [],
-                                            "features_and_traits": [],
-                                            "personality_traits": "Brave and loyal",
-                                            "ideals": "Protect the innocent",
-                                            "bonds": "My family",
-                                            "flaws": "Too trusting",
-                                            "notes": "",
-                                            "portrait": {"image_path": "test.png", "prompt": ""},
-                                        }
-                                    }
-                                ),
-                            )
-                        )
-                    ]
-                )
-            )
-        ]
+        mock_tool_call = Mock()
+        mock_tool_call.function = Mock()
+        mock_tool_call.function.name = "save_character"
+        mock_tool_call.function.arguments = json.dumps(
+            {
+                "character": {
+                    "character_name": "Test Character",
+                    "player_name": "Test Player",
+                    "class_and_level": "Fighter 1",
+                    "race": "Human",
+                    "background": "Soldier",
+                    "alignment": "Lawful Good",
+                    "experience_points": 0,
+                    "abilities": {
+                        "strength": 16,
+                        "dexterity": 14,
+                        "constitution": 15,
+                        "intelligence": 10,
+                        "wisdom": 12,
+                        "charisma": 8,
+                    },
+                    "saving_throws": {
+                        "strength": True,
+                        "dexterity": False,
+                        "constitution": True,
+                        "intelligence": False,
+                        "wisdom": False,
+                        "charisma": False,
+                    },
+                    "skills": {
+                        "athletics": True,
+                        "perception": True,
+                    },
+                    "proficiency_bonus": 2,
+                    "passive_wisdom": 11,
+                    "combat_stats": {
+                        "armor_class": 16,
+                        "initiative": 2,
+                        "speed": 30,
+                        "hit_point_maximum": 12,
+                        "current_hit_points": 12,
+                        "temporary_hit_points": 0,
+                        "hit_dice_total": "1d10",
+                        "death_saves": {"successes": 0, "failures": 0},
+                    },
+                    "attacks_and_spellcasting": [],
+                    "equipment": [],
+                    "other_proficiencies_and_languages": [],
+                    "features_and_traits": [],
+                    "personality_traits": "Brave and loyal",
+                    "ideals": "Protect the innocent",
+                    "bonds": "My family",
+                    "flaws": "Too trusting",
+                    "notes": "",
+                    "portrait": {"image_path": "test.png", "prompt": ""},
+                }
+            }
+        )
+        mock_message = Mock()
+        mock_message.tool_calls = [mock_tool_call]
+        mock_response.choices = [Mock(message=mock_message)]
         client_instance.chat.completions.create.return_value = mock_response
 
         # Mock portrait prompt generation
@@ -98,9 +91,13 @@ def mock_openai_client():
             mock_prompt_response,  # Portrait prompt
         ]
 
-        # Mock image generation
+        # Mock image generation - use valid base64 padding
+        import base64
+
         mock_image_response = Mock()
-        mock_image_response.data = [Mock(b64_json="base64_image_data")]
+        # Create a valid base64 string (must be multiple of 4)
+        valid_base64 = base64.b64encode(b"fake_image_data").decode("utf-8")
+        mock_image_response.data = [Mock(b64_json=valid_base64)]
         client_instance.images.generate.return_value = mock_image_response
 
         yield client_instance
@@ -122,11 +119,17 @@ class TestCharacterGeneration:
     def test_generate_player_character_success(self, mock_open, mock_path, mock_openai_client):
         """Test successful character generation"""
         # Setup mocks
-        mock_path_instance = Mock()
-        mock_path.return_value.__truediv__.return_value = mock_path_instance
-        mock_path_instance.parent.parent.parent = Mock()
-        mock_path_instance.parent.parent.parent.__truediv__.return_value.mkdir = Mock()
-        mock_path_instance.__truediv__.return_value = Mock(__str__=lambda x: "test.png")
+        from pathlib import Path as RealPath
+
+        # Create a real Path mock that supports operations
+        mock_path_instance = Mock(spec=RealPath)
+        mock_path_instance.__truediv__ = Mock(return_value=mock_path_instance)
+        mock_path_instance.mkdir = Mock()
+        mock_path_instance.__str__ = Mock(return_value="test.png")
+
+        # Setup Path to return our mock
+        mock_path.return_value = mock_path_instance
+        mock_path_instance.parent = mock_path_instance
 
         result = generate_player_character(
             character_name="Test Character",

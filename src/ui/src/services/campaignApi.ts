@@ -1003,24 +1003,3 @@ export async function getSceneNarrationAudio(
 
   return response.blob();
 }
-
-export async function getMonsterStatBlock(
-  monsterName: string,
-  monsterData: Monster
-): Promise<{ monster_name: string; stat_block: string }> {
-  const response = await fetch(`${API_BASE_URL}/api/monster-stat-block/${encodeURIComponent(monsterName)}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(monsterData),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    throw new Error(error.detail || `Failed to get stat block: ${response.statusText}`);
-  }
-
-  return response.json();
-}
-

@@ -7,6 +7,7 @@ import os
 import re
 import textwrap
 import time
+from pathlib import Path
 from typing import List, Optional
 
 import fitz  # PyMuPDF (binary version)
@@ -14,8 +15,9 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from pinecone import Pinecone, ServerlessSpec
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from .env file in project root
+env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 
 class RAGService:
