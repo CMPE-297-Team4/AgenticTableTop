@@ -1,4 +1,5 @@
 # Load config.yaml from project root (one level up from src/)
+import json
 import re
 import time
 from pathlib import Path
@@ -35,14 +36,58 @@ rag_config = config.get("RAG", {})
 rag_enabled = rag_config.get("enabled", False)
 
 
-def background_story(model, state):
-    print("==================Generating background story==================")
-    start_time = time.time()
-    # Get outline from input
-    user_outline = background_story_outline
+# ============================================================================
+# GENERATION FUNCTIONS (with optional RAG support)
+# ============================================================================
 
-    # Update prompt
-    prompt = re.sub(r"<outline>", user_outline, storyteller_prompt)
+
+def background_story_with_rag(model, state, rag_service=None, knowledge_namespace=None):
+    """
+    Generate background story, optionally augmented with knowledge from vector database.
+
+    Args:
+        model: The LLM model instance
+        state: The game state to update
+        rag_service: Optional RAGService instance
+        knowledge_namespace: Optional namespace to retrieve knowledge from
+    """
+    use_rag = rag_enabled and rag_service is not None
+
+    if use_rag:
+        print("==================Generating background story (RAG-Augmented)==================")
+    else:
+        print("==================Generating background story==================")
+
+    start_time = time.time()
+
+    # Get outline from input (prefer state override if available)
+    user_outline = state.get("user_outline", background_story_outline)
+
+    # Retrieve relevant knowledge if RAG is available
+    knowledge_context = ""
+    if use_rag:
+        namespace = knowledge_namespace or rag_config.get("knowledge_base", {}).get(
+            "setting_namespace", "campaign-setting"
+        )
+        print(f"Retrieving context from namespace '{namespace}'...")
+        try:
+            knowledge_context = rag_service.retrieve_context(
+                query=user_outline,
+                namespace=namespace,
+                top_k=rag_config.get("retrieval", {}).get("top_k", 3),
+                limit=rag_config.get("retrieval", {}).get("max_context_chars", 8000),
+            )
+        except Exception as e:
+            print(f"Warning: Could not retrieve context: {e}")
+            knowledge_context = ""
+
+    # Update prompt with knowledge if available, otherwise use standard prompt
+    if use_rag and knowledge_context:
+        prompt = rag_storyteller_prompt
+        prompt = re.sub(r"{{user_outline}}", user_outline, prompt)
+        prompt = re.sub(r"{{knowledge_context}}", knowledge_context, prompt)
+    else:
+        prompt = re.sub(r"<outline>", user_outline, storyteller_prompt)
 
     # Make LLM request
     response = model.invoke(prompt)
@@ -54,13 +99,18 @@ def background_story(model, state):
         print("ERROR: Failed to parse storyteller result. Please check the LLM response format.")
         return False
 
-    title, background_story, key_themes = result
-    # Print response
+    title, background_story_text, key_themes = result
+
+    # Update state
     state["title"] = title
-    state["background_story"] = background_story
+    state["background_story"] = background_story_text
     state["key_themes"] = key_themes
+    if use_rag:
+        state["rag_augmented"] = True
+
     print(state["title"])
     print(state["background_story"])
+
     end_time = time.time()
     print(
         f"Time taken for this request: {end_time - start_time} seconds, and tokens used: {get_total_tokens(response)}"
@@ -68,16 +118,75 @@ def background_story(model, state):
     return True
 
 
-def generate_game_plan(model, state):
-    print("==================Generating game plan==================")
+def generate_game_plan_with_rag(
+    model, state, rag_service=None, knowledge_namespace=None, num_acts: Optional[int] = None
+):
+    """
+    Generate game plan, optionally augmented with knowledge from vector database.
+
+    Args:
+        model: The LLM model instance
+        state: The game state containing title and background
+        rag_service: Optional RAGService instance
+        knowledge_namespace: Optional namespace to retrieve knowledge from
+        num_acts: Optional number of acts to generate
+    """
+    use_rag = rag_enabled and rag_service is not None
+
+    if use_rag:
+        print("==================Generating game plan (RAG-Augmented)==================")
+    else:
+        print("==================Generating game plan==================")
+
     start_time = time.time()
 
     # Get data from state
     story_title = state["title"]
     story_background = state["background_story"]
-    # Update prompt
-    prompt = re.sub(r"<title>", story_title, game_plan_prompt)
-    prompt = re.sub(r"<background>", story_background, prompt)
+    campaign_theme = state.get("key_themes", [""])[0] if state.get("key_themes") else ""
+
+    # Retrieve relevant knowledge if RAG is available
+    knowledge_context = ""
+    if use_rag:
+        namespace = knowledge_namespace or rag_config.get("knowledge_base", {}).get(
+            "rules_namespace", "campaign-rules"
+        )
+        print(f"Retrieving context from namespace '{namespace}'...")
+        try:
+            knowledge_context = rag_service.retrieve_context(
+                query=f"Campaign structure and acts for {story_title}: {story_background[:500]}",
+                namespace=namespace,
+                top_k=rag_config.get("retrieval", {}).get("top_k", 3),
+                limit=rag_config.get("retrieval", {}).get("max_context_chars", 8000),
+            )
+        except Exception as e:
+            print(f"Warning: Could not retrieve context: {e}")
+            knowledge_context = ""
+
+    # Update prompt with knowledge if available, otherwise use standard prompt
+    if use_rag and knowledge_context:
+        prompt = rag_game_plan_prompt
+        prompt = re.sub(r"{{title}}", story_title, prompt)
+        prompt = re.sub(r"{{background}}", story_background, prompt)
+        prompt = re.sub(r"{{knowledge_context}}", knowledge_context, prompt)
+    else:
+        prompt = re.sub(r"<title>", story_title, game_plan_prompt)
+        prompt = re.sub(r"<background>", story_background, prompt)
+
+    # Add campaign theme to prompt (CRITICAL for theme matching)
+    if campaign_theme:
+        theme_instruction = f"\n\n===CAMPAIGN THEME===\n**{campaign_theme}**\n\nREMINDER: ALL act titles, summaries, locations, and conflicts MUST match the '{campaign_theme}' theme!"
+        prompt = prompt + theme_instruction
+
+    # Modify prompt to request specific number of acts if provided
+    if num_acts is not None:
+        prompt = prompt.replace("3–5 Acts", f"{num_acts} Act{'s' if num_acts != 1 else ''}")
+        prompt = prompt.replace("3-5 Acts", f"{num_acts} Act{'s' if num_acts != 1 else ''}")
+        prompt = prompt.replace("3. Propose 3–5", f"3. Propose exactly {num_acts}")
+        prompt = prompt.replace(
+            "Define 3-5 clear Acts",
+            f"Define exactly {num_acts} clear Act{'s' if num_acts != 1 else ''}",
+        )
 
     response = model.invoke(prompt)
     content = response.content
@@ -85,9 +194,13 @@ def generate_game_plan(model, state):
     # Parse the acts from the response
     acts = parse_acts_result(content)
     state["acts"] = acts
+    if use_rag:
+        state["rag_augmented"] = True
+
     for i in range(len(state["acts"])):
         print(state["acts"][i]["act_title"])
         print(state["acts"][i]["act_summary"])
+
     end_time = time.time()
     print(
         f"Time taken for this request: {end_time - start_time} seconds, and tokens used: {get_total_tokens(response)}"
@@ -95,21 +208,35 @@ def generate_game_plan(model, state):
     return True
 
 
-def generate_quests_for_act(model, state, act_index):
+def generate_quests_for_act_with_rag(
+    model,
+    state,
+    act_index,
+    rag_service=None,
+    knowledge_namespace=None,
+    num_quests: Optional[int] = None,
+):
     """
-    Generate quests for a specific act.
+    Generate quests for a specific act, optionally augmented with knowledge from vector database.
 
     Args:
         model: The LLM model instance
         state: The game state containing acts
         act_index: Index of the act to generate quests for
-
-    Returns:
-        bool: True if successful, False otherwise
+        rag_service: Optional RAGService instance
+        knowledge_namespace: Optional namespace to retrieve knowledge from
+        num_quests: Optional number of quests to generate
     """
-    print(
-        f"==================Generating quests for {state['acts'][act_index]['act_title']}=================="
-    )
+    use_rag = rag_enabled and rag_service is not None
+
+    act_title = state["acts"][act_index]["act_title"]
+    if use_rag:
+        print(
+            f"==================Generating quests (RAG-Augmented) for {act_title}=================="
+        )
+    else:
+        print(f"==================Generating quests for {act_title}==================")
+
     start_time = time.time()
 
     # Get act data
@@ -121,14 +248,77 @@ def generate_quests_for_act(model, state, act_index):
     key_locations = ", ".join(act.get("key_locations", []))
     mechanics = ", ".join(act.get("mechanics_or_features_introduced", []))
 
-    # Build prompt
-    prompt = quest_generation_prompt
-    prompt = re.sub(r"<act_title>", act_title, prompt)
-    prompt = re.sub(r"<act_summary>", act_summary, prompt)
-    prompt = re.sub(r"<narrative_goal>", narrative_goal, prompt)
-    prompt = re.sub(r"<primary_conflict>", primary_conflict, prompt)
-    prompt = re.sub(r"<key_locations>", key_locations, prompt)
-    prompt = re.sub(r"<mechanics>", mechanics, prompt)
+    # Get campaign theme for quest generation
+    campaign_theme = state.get("key_themes", [""])[0] if state.get("key_themes") else ""
+
+    # Retrieve relevant knowledge for quest generation if RAG is available
+    knowledge_context = ""
+    if use_rag:
+        namespace = knowledge_namespace or rag_config.get("knowledge_base", {}).get(
+            "rules_namespace", "campaign-rules"
+        )
+        print(f"Retrieving context from namespace '{namespace}'...")
+        try:
+            knowledge_context = rag_service.retrieve_context(
+                query=f"Quest design for act: {act_title}. {act_summary}",
+                namespace=namespace,
+                top_k=rag_config.get("retrieval", {}).get("top_k", 3),
+                limit=rag_config.get("retrieval", {}).get("max_context_chars", 8000),
+            )
+        except Exception as e:
+            print(f"Warning: Could not retrieve context: {e}")
+            knowledge_context = ""
+
+    # Build prompt - use RAG prompt if RAG is available and has context, otherwise use standard prompt
+    if use_rag and knowledge_context:
+        prompt = rag_quest_generation_prompt
+        prompt = re.sub(r"{{act_title}}", act_title, prompt)
+        prompt = re.sub(r"{{act_summary}}", act_summary, prompt)
+        prompt = re.sub(r"{{knowledge_context}}", knowledge_context, prompt)
+    else:
+        prompt = quest_generation_prompt
+        prompt = re.sub(r"<act_title>", act_title, prompt)
+        prompt = re.sub(r"<act_summary>", act_summary, prompt)
+        prompt = re.sub(r"<narrative_goal>", narrative_goal, prompt)
+        prompt = re.sub(r"<primary_conflict>", primary_conflict, prompt)
+        prompt = re.sub(r"<key_locations>", key_locations, prompt)
+        prompt = re.sub(r"<mechanics>", mechanics, prompt)
+
+    # Add campaign theme to prompt (CRITICAL for theme matching)
+    if campaign_theme:
+        theme_instruction = f"\n\n===CAMPAIGN THEME===\n**{campaign_theme}**\n\nREMINDER: ALL quest names, descriptions, and objectives MUST match the '{campaign_theme}' theme!"
+        prompt = prompt + theme_instruction
+
+    # Modify prompt to request specific number of quests if provided
+    if num_quests is not None:
+        if use_rag and knowledge_context:
+            prompt = prompt.replace(
+                "Design a **single, concrete quest**",
+                f"Design exactly {num_quests} concrete quest{'s' if num_quests != 1 else ''}",
+            )
+            prompt = prompt.replace(
+                "Create a quest that:",
+                f"Create {num_quests} quest{'s' if num_quests != 1 else ''} that:",
+            )
+            # Update output format to show list when multiple quests
+            if num_quests > 1:
+                prompt = prompt.replace(
+                    '# Output Format\nReturn strictly in JSON format:\n{\n  "quest_title":',
+                    '# Output Format\nReturn strictly in JSON format:\n{\n  "quests": [\n    {\n      "quest_title":',
+                )
+                prompt = prompt.replace(
+                    '  "knowledge_used": ["relevant knowledge items"]\n}',
+                    '      "knowledge_used": ["relevant knowledge items"]\n    }\n  ]\n}',
+                )
+        else:
+            prompt = prompt.replace(
+                "Generate 3-5 quests",
+                f"Generate exactly {num_quests} quest{'s' if num_quests != 1 else ''}",
+            )
+            prompt = prompt.replace(
+                "2. Design 3-5 quests",
+                f"2. Design exactly {num_quests} quest{'s' if num_quests != 1 else ''}",
+            )
 
     # Make LLM request
     response = model.invoke(prompt)
@@ -137,17 +327,39 @@ def generate_quests_for_act(model, state, act_index):
     # Parse the quests from the response
     quests = parse_quests_result(content)
 
+    # Handle case where RAG prompt returns a single quest object instead of array
+    # (when num_quests is 1 or None, the prompt shows single object format)
+    if not quests:
+        # Try to parse as single quest object
+        try:
+            json_str = content
+            if "```json" in json_str:
+                json_str = json_str.split("```json")[1].split("```")[0].strip()
+            elif "```" in json_str:
+                json_str = json_str.split("```")[1].split("```")[0].strip()
+
+            # Try to parse as single quest
+            quest_data = json.loads(json_str)
+            # If it has quest_title or quest_name, it's a single quest
+            if "quest_title" in quest_data or "quest_name" in quest_data:
+                quests = [quest_data]
+        except Exception:
+            pass  # If parsing fails, quests remains empty list
+
     # Initialize quests dict if it doesn't exist
     if "quests" not in state:
         state["quests"] = {}
 
     # Store quests for this act
     state["quests"][act_title] = quests
+    if use_rag:
+        state["rag_augmented"] = True
 
     # Print quest summaries
     print(f"\nGenerated {len(quests)} quests:")
     for i, quest in enumerate(quests, 1):
-        print(f"\n  Quest {i}: {quest.get('quest_name', 'Unnamed Quest')}")
+        quest_name = quest.get("quest_name", quest.get("quest_title", "Unnamed Quest"))
+        print(f"\n  Quest {i}: {quest_name}")
         print(f"    Type: {quest.get('quest_type', 'Unknown')}")
         description = quest.get("description", "No description available")
         print(f"    Description: {description}")
@@ -166,219 +378,12 @@ def generate_quests_for_act(model, state, act_index):
     return True
 
 
-# ============================================================================
-# RAG-AUGMENTED FUNCTIONS
-# ============================================================================
-
-
-def background_story_with_rag(model, state, rag_service=None, knowledge_namespace=None):
-    """
-    Generate background story augmented with knowledge from vector database.
-
-    Args:
-        model: The LLM model instance
-        state: The game state to update
-        rag_service: Optional RAGService instance
-        knowledge_namespace: Optional namespace to retrieve knowledge from
-    """
-    if not rag_enabled or rag_service is None:
-        print("RAG not enabled. Falling back to standard generation.")
-        return background_story(model, state)
-
-    print("==================Generating background story (RAG-Augmented)==================")
-    start_time = time.time()
-
-    # Get outline from input
-    user_outline = background_story_outline
-    namespace = knowledge_namespace or rag_config.get("knowledge_base", {}).get(
-        "setting_namespace", "campaign-setting"
-    )
-
-    # Retrieve relevant knowledge
-    print(f"Retrieving context from namespace '{namespace}'...")
-    try:
-        knowledge_context = rag_service.retrieve_context(
-            query=user_outline,
-            namespace=namespace,
-            top_k=rag_config.get("retrieval", {}).get("top_k", 3),
-            limit=rag_config.get("retrieval", {}).get("max_context_chars", 8000),
-        )
-    except Exception as e:
-        print(f"Warning: Could not retrieve context: {e}")
-        knowledge_context = ""
-
-    # Update prompt with knowledge
-    prompt = rag_storyteller_prompt
-    prompt = re.sub(r"{{user_outline}}", user_outline, prompt)
-    prompt = re.sub(r"{{knowledge_context}}", knowledge_context, prompt)
-
-    # Make LLM request
-    response = model.invoke(prompt)
-    content = response.content
-
-    # Parse response
-    title, background_story_text, key_themes = parse_storyteller_result(content)
-
-    # Update state
-    state["title"] = title
-    state["background_story"] = background_story_text
-    state["key_themes"] = key_themes
-    state["rag_augmented"] = True
-
-    print(state["title"])
-    print(state["background_story"])
-
-    end_time = time.time()
-    print(
-        f"Time taken for this request: {end_time - start_time} seconds, and tokens used: {get_total_tokens(response)}"
-    )
-    return True
-
-
-def generate_game_plan_with_rag(model, state, rag_service=None, knowledge_namespace=None):
-    """
-    Generate game plan augmented with knowledge from vector database.
-
-    Args:
-        model: The LLM model instance
-        state: The game state containing title and background
-        rag_service: Optional RAGService instance
-        knowledge_namespace: Optional namespace to retrieve knowledge from
-    """
-    if not rag_enabled or rag_service is None:
-        print("RAG not enabled. Falling back to standard generation.")
-        return generate_game_plan(model, state)
-
-    print("==================Generating game plan (RAG-Augmented)==================")
-    start_time = time.time()
-
-    # Get data from state
-    story_title = state["title"]
-    story_background = state["background_story"]
-    namespace = knowledge_namespace or rag_config.get("knowledge_base", {}).get(
-        "rules_namespace", "campaign-rules"
-    )
-
-    # Retrieve relevant knowledge
-    print(f"Retrieving context from namespace '{namespace}'...")
-    try:
-        knowledge_context = rag_service.retrieve_context(
-            query=f"Campaign structure and acts for {story_title}: {story_background[:500]}",
-            namespace=namespace,
-            top_k=rag_config.get("retrieval", {}).get("top_k", 3),
-            limit=rag_config.get("retrieval", {}).get("max_context_chars", 8000),
-        )
-    except Exception as e:
-        print(f"Warning: Could not retrieve context: {e}")
-        knowledge_context = ""
-
-    # Update prompt with knowledge
-    prompt = rag_game_plan_prompt
-    prompt = re.sub(r"{{title}}", story_title, prompt)
-    prompt = re.sub(r"{{background}}", story_background, prompt)
-    prompt = re.sub(r"{{knowledge_context}}", knowledge_context, prompt)
-
-    response = model.invoke(prompt)
-    content = response.content
-
-    # Parse the acts from the response
-    acts = parse_acts_result(content)
-    state["acts"] = acts
-    state["rag_augmented"] = True
-
-    for i in range(len(state["acts"])):
-        print(state["acts"][i]["act_title"])
-        print(state["acts"][i]["act_summary"])
-
-    end_time = time.time()
-    print(
-        f"Time taken for this request: {end_time - start_time} seconds, and tokens used: {get_total_tokens(response)}"
-    )
-    return True
-
-
-def generate_quests_for_act_with_rag(
-    model, state, act_index, rag_service=None, knowledge_namespace=None
-):
-    """
-    Generate quests for a specific act, augmented with knowledge from vector database.
-
-    Args:
-        model: The LLM model instance
-        state: The game state containing acts
-        act_index: Index of the act to generate quests for
-        rag_service: Optional RAGService instance
-        knowledge_namespace: Optional namespace to retrieve knowledge from
-    """
-    if not rag_enabled or rag_service is None:
-        print("RAG not enabled. Falling back to standard generation.")
-        return generate_quests_for_act(model, state, act_index)
-
-    print(
-        f"==================Generating quests (RAG-Augmented) for {state['acts'][act_index]['act_title']}=================="
-    )
-    start_time = time.time()
-
-    # Get act data
-    act = state["acts"][act_index]
-    act_title = act["act_title"]
-    act_summary = act["act_summary"]
-    namespace = knowledge_namespace or rag_config.get("knowledge_base", {}).get(
-        "rules_namespace", "campaign-rules"
-    )
-
-    # Retrieve relevant knowledge for quest generation
-    print(f"Retrieving context from namespace '{namespace}'...")
-    try:
-        knowledge_context = rag_service.retrieve_context(
-            query=f"Quest design for act: {act_title}. {act_summary}",
-            namespace=namespace,
-            top_k=rag_config.get("retrieval", {}).get("top_k", 3),
-            limit=rag_config.get("retrieval", {}).get("max_context_chars", 8000),
-        )
-    except Exception as e:
-        print(f"Warning: Could not retrieve context: {e}")
-        knowledge_context = ""
-
-    # Build prompt
-    prompt = rag_quest_generation_prompt
-    prompt = re.sub(r"{{act_title}}", act_title, prompt)
-    prompt = re.sub(r"{{act_summary}}", act_summary, prompt)
-    prompt = re.sub(r"{{knowledge_context}}", knowledge_context, prompt)
-
-    # Make LLM request
-    response = model.invoke(prompt)
-    content = response.content
-
-    # Parse the quests from the response
-    quests = parse_quests_result(content)
-
-    # Initialize quests dict if it doesn't exist
-    if "quests" not in state:
-        state["quests"] = {}
-
-    # Store quests for this act
-    state["quests"][act_title] = quests
-    state["rag_augmented"] = True
-
-    # Print quest summaries
-    print(f"\nGenerated {len(quests)} quests:")
-    for i, quest in enumerate(quests, 1):
-        print(f"\n  Quest {i}: {quest.get('quest_title', 'Unnamed Quest')}")
-        if "objectives" in quest:
-            print("    Objectives:")
-            for j, obj in enumerate(quest["objectives"], 1):
-                print(f"      {j}. {obj}")
-
-    end_time = time.time()
-    print(
-        f"Time taken for this request: {end_time - start_time} seconds, and tokens used: {get_total_tokens(response)}"
-    )
-    return True
-
-
 def generate_monsters_for_combat_quests(
-    model, state, trajectory_logger: Optional[TrajectoryLogger] = None
+    model,
+    state,
+    trajectory_logger: Optional[TrajectoryLogger] = None,
+    monsters_per_quest: Optional[int] = None,
+    campaign_theme: Optional[str] = None,
 ):
     """
     Generate monsters for all combat quests in the campaign.
@@ -394,11 +399,15 @@ def generate_monsters_for_combat_quests(
         model: The LLM model instance
         state: The game state containing quests (organized by act_title)
         trajectory_logger: Optional trajectory logger for recording generation attempts
+        monsters_per_quest: Number of monsters to generate per quest
+        campaign_theme: Campaign theme to match monster style
 
     Returns:
         bool: True if successful, False otherwise
     """
     print("==================Generating monsters for combat quests==================")
+    if campaign_theme:
+        print(f"Campaign theme: {campaign_theme}")
     start_time = time.time()
 
     # Initialize trajectory logger if not provided
@@ -472,7 +481,12 @@ def generate_monsters_for_combat_quests(
 
                 # Generate monsters for this combat quest
                 monsters, response_content, tokens_used = generate_monsters_for_quest(
-                    model, quest, return_response=True
+                    model,
+                    quest,
+                    quest_context=None,
+                    return_response=True,
+                    num_monsters=monsters_per_quest,
+                    campaign_theme=campaign_theme,
                 )
 
                 if monsters and len(monsters) > 0:
@@ -589,7 +603,12 @@ def generate_monsters_for_combat_quests(
 
 
 def generate_monsters_for_quest(
-    model, quest: Dict[str, Any], quest_context: Optional[str] = None, return_response: bool = False
+    model,
+    quest: Dict[str, Any],
+    quest_context: Optional[str] = None,
+    return_response: bool = False,
+    num_monsters: Optional[int] = None,
+    campaign_theme: Optional[str] = None,
 ) -> Union[List[Dict[str, Any]], Tuple[List[Dict[str, Any]], str, int]]:
     """
     Generate monsters for a specific combat quest.
@@ -599,6 +618,8 @@ def generate_monsters_for_quest(
         quest: Quest dictionary containing quest details
         quest_context: Optional additional context about the quest
         return_response: If True, return response content and tokens used
+        num_monsters: Optional number of monsters to generate (None = auto 1-3)
+        campaign_theme: Optional campaign theme to match monster style
 
     Returns:
         If return_response=False: List of monster dictionaries with stat blocks
@@ -625,6 +646,28 @@ def generate_monsters_for_quest(
     prompt = re.sub(r"<difficulty>", difficulty, prompt)
     prompt = re.sub(r"<locations>", locations, prompt)
     prompt = re.sub(r"<objectives>", objectives, prompt)
+
+    # Add campaign theme context if provided
+    if campaign_theme:
+        theme_context = f"\n\n===Campaign Theme===\n{campaign_theme}\n\nIMPORTANT: Create monsters that match this campaign theme!"
+        prompt += theme_context
+        print(f"    Campaign theme: {campaign_theme}")
+
+    # Modify prompt to request specific number of monsters if provided
+    if num_monsters is not None:
+        prompt = prompt.replace(
+            "Generate EXACTLY the requested number of monsters",
+            f"Generate EXACTLY {num_monsters} monster{'s' if num_monsters != 1 else ''}",
+        )
+        prompt = prompt.replace(
+            "Generate 1-3 monsters",
+            f"Generate exactly {num_monsters} monster{'s' if num_monsters != 1 else ''}",
+        )
+        prompt = prompt.replace(
+            'The "monsters" array must contain at least 1 monster object (generate 1-3 monsters)',
+            f"The \"monsters\" array must contain exactly {num_monsters} monster object{'s' if num_monsters != 1 else ''}",
+        )
+        print(f"    Requested {num_monsters} monster(s)")
 
     # Add quest context if provided
     if quest_context:

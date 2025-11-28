@@ -29,6 +29,9 @@ async def create_character(
 ):
     """Generate and create a new D&D 5e player character"""
     try:
+        # Use current user's username as player_name if not provided
+        player_name = request.player_name or current_user.username
+
         # Generate character using service
         result = generate_player_character(
             character_name=request.character_name,
@@ -36,7 +39,7 @@ async def create_character(
             race=request.race,
             background=request.background,
             alignment=request.alignment,
-            player_name=request.player_name,
+            player_name=player_name,
         )
 
         if "error" in result:

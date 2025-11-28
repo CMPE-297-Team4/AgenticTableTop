@@ -10,10 +10,18 @@ import time
 from pathlib import Path
 from typing import List, Optional
 
-import fitz  # PyMuPDF (binary version)
 from dotenv import load_dotenv
 from openai import OpenAI
 from pinecone import Pinecone, ServerlessSpec
+
+# Optional PyMuPDF import (only needed for PDF parsing)
+try:
+    import fitz  # PyMuPDF (binary version)
+
+    _pymupdf_available = True
+except ImportError:
+    fitz = None  # type: ignore
+    _pymupdf_available = False
 
 # Load environment variables from .env file in project root
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -103,6 +111,11 @@ class RAGService:
         Returns:
             List of text lines
         """
+        if not _pymupdf_available or fitz is None:
+            raise ImportError(
+                "PyMuPDF (fitz) is required for PDF extraction. Install with: pip install PyMuPDF"
+            )
+
         doc = fitz.open(pdf_path)
         raw = "\n".join(page.get_text() for page in doc)
 
@@ -153,6 +166,11 @@ class RAGService:
         Returns:
             Number of vectors upserted
         """
+        if not _pymupdf_available or fitz is None:
+            raise ImportError(
+                "PyMuPDF (fitz) is required for PDF extraction. Install with: pip install PyMuPDF"
+            )
+
         index_name = index_name or self.default_index_name
         self.ensure_index(index_name)
 

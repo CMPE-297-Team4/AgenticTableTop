@@ -1,15 +1,33 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { FantasyButton } from "@/components/FantasyButton";
+import { FantasyCard, FantasyCardContent, FantasyCardHeader, FantasyCardTitle, FantasyCardDescription } from "@/components/FantasyCard";
 import { Card } from "@/components/ui/card";
+import { AppNavBar } from "@/components/AppNavBar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, LogOut, Library, User, Play, Scroll, Users, Gamepad2 } from "lucide-react";
-import { generateCampaign, loadCampaign, listUserCampaigns, type Campaign, type CampaignRequest } from "@/services/campaignApi";
+import { Loader2, LogOut, Library, User, Play, Scroll, Users, Gamepad2, Settings, ChevronDown, ChevronUp, Plus, Home } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { generateCampaign, loadCampaign, listUserCampaigns, listCharacters, type Campaign, type CampaignRequest, type PlayerCharacter } from "@/services/campaignApi";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
+import { campaignTemplates, type CampaignTemplate } from "@/data/campaignTemplates";
 
 const Index = () => {
   const [outline, setOutline] = useState("I want a dark fantasy campaign with dragons and ancient ruins.");
@@ -17,6 +35,14 @@ const Index = () => {
   const [saveToPinecone, setSaveToPinecone] = useState(false);
   const [userId, setUserId] = useState("");
   const [tags, setTags] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [difficultyLevel, setDifficultyLevel] = useState<'Easy' | 'Medium' | 'Hard' | 'Deadly'>('Medium');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [useTemplate, setUseTemplate] = useState(false);
+  const [numActs, setNumActs] = useState<number | ''>('');
+  const [numQuestsPerAct, setNumQuestsPerAct] = useState<number | ''>('');
+  const [generateMonsters, setGenerateMonsters] = useState(true);
+  const [monstersPerQuest, setMonstersPerQuest] = useState<number | ''>('');
   const [savedCampaigns, setSavedCampaigns] = useState<Array<{
     id: number;
     title: string;
@@ -25,15 +51,18 @@ const Index = () => {
     created_at: string | null;
     updated_at: string | null;
   }>>([]);
+  const [characters, setCharacters] = useState<PlayerCharacter[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { logout, loading: authLoading, user } = useAuth();
 
-  // Load saved campaigns on mount
+  // Load saved campaigns and characters on mount
   useEffect(() => {
     if (!authLoading && user) {
       loadSavedCampaigns();
+      loadCharacters();
     }
   }, [authLoading, user]);
 
@@ -41,12 +70,24 @@ const Index = () => {
     setLoadingCampaigns(true);
     try {
       const campaigns = await listUserCampaigns();
-      setSavedCampaigns(campaigns);
+      console.log("Loaded campaigns:", campaigns);
+      setSavedCampaigns(campaigns || []);
     } catch (error: any) {
       console.error("Error loading campaigns:", error);
+      setSavedCampaigns([]);
       // Don't show error toast, just log it
     } finally {
       setLoadingCampaigns(false);
+    }
+  };
+
+  const loadCharacters = async () => {
+    try {
+      const chars = await listCharacters();
+      setCharacters(chars);
+    } catch (error: any) {
+      console.error("Error loading characters:", error);
+      // Don't show error toast, just log it
     }
   };
 
@@ -54,6 +95,18 @@ const Index = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // If not authenticated, redirect to login
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4 font-fantasy-body">Please log in to create campaigns</p>
+          <FantasyButton onClick={() => navigate("/")} variant="outline">Go to Login</FantasyButton>
+        </div>
       </div>
     );
   }
@@ -75,7 +128,12 @@ const Index = () => {
         save_to_pinecone: saveToPinecone,
         user_id: userId || undefined,
         tags: tags ? tags.split(",").map(t => t.trim()).filter(Boolean) : undefined,
-        force_new: true  // Always generate a new campaign, bypass cache
+        force_new: true,  // Always generate a new campaign, bypass cache
+        difficulty_level: difficultyLevel,
+        num_acts: numActs ? Number(numActs) : undefined,
+        num_quests_per_act: numQuestsPerAct ? Number(numQuestsPerAct) : undefined,
+        generate_monsters: generateMonsters,
+        monsters_per_quest: monstersPerQuest ? Number(monstersPerQuest) : undefined,
       };
       
       const campaign: Campaign = await generateCampaign(request);
@@ -85,14 +143,17 @@ const Index = () => {
       
       toast({
         title: "Success!",
-        description: `Generated "${campaign.title}" with ${campaign.total_acts} acts and ${campaign.total_quests} quests! Campaign saved to your library.`,
+        description: `Generated "${campaign.title}" with ${campaign.total_acts} acts and ${campaign.total_quests} quests! Now create characters to start playing.`,
       });
       
       // Reload saved campaigns
       await loadSavedCampaigns();
       
-      // Navigate to game page
-      navigate("/game");
+      // Store campaign ID for quick session creation
+      sessionStorage.setItem("newCampaignId", String(campaign.id));
+      
+      // Navigate to lobby to create characters and start game
+      navigate("/lobby");
     } catch (error: any) {
       console.error("Error generating campaign:", error);
       toast({
@@ -132,8 +193,11 @@ const Index = () => {
     }
   };
 
+  // Debug: Log to verify component is rendering
+  console.log("Index component rendering, user:", user, "authLoading:", authLoading);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/20 p-4 relative overflow-hidden fantasy-bg">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/20 relative overflow-hidden fantasy-bg">
       {/* Fantasy Background Elements */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10"></div>
       
@@ -148,69 +212,28 @@ const Index = () => {
         <div className="absolute bottom-1/6 right-1/6 w-1.5 h-1.5 bg-accent/15 rounded-full floating-particle" style={{animationDelay: '6s'}}></div>
       </div>
       
+      {/* Top Navigation Bar */}
+      <AppNavBar
+        campaigns={savedCampaigns}
+        characters={characters}
+        onNavigateToCampaign={(campaignId) => navigate(`/create-campaign?campaignId=${campaignId}`)}
+        onNavigateToCharacter={(characterId) => navigate(`/character-create?edit=${characterId}`)}
+      />
+
       {/* Magical Shine Effect */}
-      <div className="absolute inset-0 magical-shine"></div>
+      <div className="absolute inset-0 magical-shine pointer-events-none"></div>
       
-      <Card className="w-full max-w-2xl p-8 space-y-6 invisible-boundary magical-glow relative z-10 backdrop-blur-sm bg-card/95 border-0 outline-0 shadow-none ring-0">
-        {/* Header with Navigation */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-accent to-accent/80 bg-clip-text text-transparent leading-tight text-no-clip">
-            AgenticTableTop
-          </h1>
-          <div className="flex items-center gap-3">
-            {user && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <User className="h-4 w-4" />
-                <span>{user.username}</span>
-              </div>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/library")}
-              className="text-foreground hover:text-primary"
-            >
-              <Library className="h-4 w-4 mr-2" />
-              Library
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/character-create")}
-              className="text-foreground hover:text-primary"
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Characters
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/sessions")}
-              className="text-foreground hover:text-primary"
-            >
-              <Gamepad2 className="h-4 w-4 mr-2" />
-              Sessions
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={logout}
-              className="text-foreground hover:text-primary"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </div>
-        </div>
-        
-        <div className="text-center space-y-2">
-          <p className="text-xl text-muted-foreground">
-            AI-Powered D&D Campaign Generator
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Generate complete campaigns with story, acts, and quests in minutes!
-          </p>
-        </div>
+      {/* Main Content */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 py-8 min-h-[calc(100vh-80px)]">
+        <div className="flex justify-center items-start pt-8">
+          <div className="w-full max-w-2xl">
+            <FantasyCard variant="parchment" withRunes className="w-full p-8 space-y-6">
+          <FantasyCardHeader className="text-center pb-4">
+            <FantasyCardTitle className="font-fantasy-title text-mystical text-2xl mb-2">
+              Create Campaign
+            </FantasyCardTitle>
+          </FantasyCardHeader>
+          <FantasyCardContent>
 
         <Tabs defaultValue="generate" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
@@ -219,79 +242,263 @@ const Index = () => {
           </TabsList>
           
           <TabsContent value="generate" className="space-y-4 mt-4">
+          {/* Campaign Templates */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Campaign Outline</label>
-            <Textarea
-              value={outline}
-              onChange={(e) => setOutline(e.target.value)}
-              placeholder="Describe the type of D&D campaign you want..."
-              className="min-h-32 text-foreground bg-background"
-              disabled={loading}
-            />
-            <p className="text-xs text-muted-foreground">
-              Example: "I want a high fantasy campaign with political intrigue, dragon riders, and ancient magical artifacts"
-            </p>
+            <Label className="text-sm font-medium">Template</Label>
+            <Select 
+              value={selectedTemplate || "custom"} 
+              onValueChange={(value) => {
+                if (value === "custom") {
+                  setSelectedTemplate("");
+                  setUseTemplate(false);
+                } else {
+                  setSelectedTemplate(value);
+                  const template = campaignTemplates.find(t => t.id === value);
+                  if (template) {
+                    setOutline(template.outline);
+                    setDifficultyLevel(template.difficulty);
+                    setUseTemplate(true);
+                  }
+                }
+              }}
+            >
+              <SelectTrigger className="bg-background text-foreground">
+                <SelectValue placeholder="Choose a template or write your own..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                <SelectItem value="custom">Custom Campaign (Write Your Own)</SelectItem>
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b">Fantasy Themes</div>
+                {campaignTemplates.filter(t => ['Dark Fantasy', 'High Fantasy', 'Fairy Tale', 'Dragon Riders'].includes(t.theme)).map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{template.icon}</span>
+                      <span>{template.name}</span>
+                      <span className="text-xs text-muted-foreground">({template.difficulty})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b mt-2">Mystery & Horror</div>
+                {campaignTemplates.filter(t => ['Murder Mystery', 'Gothic Horror', 'Zombie'].includes(t.theme)).map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{template.icon}</span>
+                      <span>{template.name}</span>
+                      <span className="text-xs text-muted-foreground">({template.difficulty})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b mt-2">Historical & Ancient</div>
+                {campaignTemplates.filter(t => ['Ancient', 'Viking', 'Samurai', 'Pirate', 'Wild West'].includes(t.theme)).map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{template.icon}</span>
+                      <span>{template.name}</span>
+                      <span className="text-xs text-muted-foreground">({template.difficulty})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b mt-2">Modern & Sci-Fi</div>
+                {campaignTemplates.filter(t => ['Steampunk', 'Cyberpunk', 'Urban Fantasy', 'Space Opera'].includes(t.theme)).map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{template.icon}</span>
+                      <span>{template.name}</span>
+                      <span className="text-xs text-muted-foreground">({template.difficulty})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-b mt-2">Special Themes</div>
+                {campaignTemplates.filter(t => ['Comedy', 'Political', 'Underwater', 'Time Travel', 'Post-Apocalyptic'].includes(t.theme)).map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{template.icon}</span>
+                      <span>{template.name}</span>
+                      <span className="text-xs text-muted-foreground">({template.difficulty})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedTemplate && selectedTemplate !== "custom" && (
+              <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+                <p className="text-xs text-muted-foreground break-words flex items-center gap-2">
+                  <span className="text-lg">{campaignTemplates.find(t => t.id === selectedTemplate)?.icon}</span>
+                  <span className="font-semibold text-foreground">{campaignTemplates.find(t => t.id === selectedTemplate)?.name}</span>
+                  <span className="ml-2">
+                    • <span className="font-semibold text-foreground">{difficultyLevel}</span>
+                    {difficultyLevel !== campaignTemplates.find(t => t.id === selectedTemplate)?.difficulty && (
+                      <span className="text-muted-foreground ml-1">(was {campaignTemplates.find(t => t.id === selectedTemplate)?.difficulty})</span>
+                    )}
+                  </span>
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Pinecone Storage Options */}
-          <div className="space-y-4 pt-4 border-t border-border/50">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="save-to-pinecone"
-                checked={saveToPinecone}
-                onCheckedChange={(checked) => setSaveToPinecone(checked as boolean)}
-              />
-              <label
-                htmlFor="save-to-pinecone"
-                className="text-sm font-medium text-foreground cursor-pointer"
-              >
-                Save to Campaign Library (Pinecone)
-              </label>
-            </div>
+          {/* Difficulty Selection */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Difficulty</Label>
+            <Select value={difficultyLevel} onValueChange={(v: 'Easy' | 'Medium' | 'Hard' | 'Deadly') => setDifficultyLevel(v)}>
+              <SelectTrigger className="bg-background text-foreground">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Easy">
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-500 text-lg">●</span>
+                    <span className="font-semibold">Easy</span>
+                    <span className="text-xs text-muted-foreground ml-2">(3 acts, 3 quests/act)</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="Medium">
+                  <div className="flex items-center gap-2">
+                    <span className="text-yellow-500 text-lg">●</span>
+                    <span className="font-semibold">Medium</span>
+                    <span className="text-xs text-muted-foreground ml-2">(4 acts, 4 quests/act)</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="Hard">
+                  <div className="flex items-center gap-2">
+                    <span className="text-orange-500 text-lg">●</span>
+                    <span className="font-semibold">Hard</span>
+                    <span className="text-xs text-muted-foreground ml-2">(5 acts, 5 quests/act)</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="Deadly">
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-500 text-lg">●</span>
+                    <span className="font-semibold">Deadly</span>
+                    <span className="text-xs text-muted-foreground ml-2">(6 acts, 6 quests/act)</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Campaign Description</Label>
+            <Textarea
+              value={outline}
+              onChange={(e) => {
+                setOutline(e.target.value);
+                if (useTemplate && selectedTemplate && e.target.value !== campaignTemplates.find(t => t.id === selectedTemplate)?.outline) {
+                  setSelectedTemplate("");
+                  setUseTemplate(false);
+                }
+              }}
+              placeholder="Describe your campaign idea..."
+              className="min-h-24 text-foreground bg-background"
+              disabled={loading}
+            />
+          </div>
+
+          {/* Advanced Settings */}
+          <div className="space-y-3 pt-3 border-t border-border/30">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Settings className="h-3 w-3" />
+              Advanced Options
+              {showAdvanced ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </button>
             
-            {saveToPinecone && (
-              <div className="space-y-3 pl-6">
-                <div>
-                  <label className="text-sm text-muted-foreground">
-                    User ID (optional)
-                  </label>
-                  <Input
-                    placeholder="Enter user ID for organization"
-                    value={userId}
-                    onChange={(e) => setUserId(e.target.value)}
-                    className="text-foreground"
-                  />
+            {showAdvanced && (
+              <div className="space-y-3 p-3 rounded-lg border border-border/30 bg-background/30">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="num-acts" className="text-xs">Acts</Label>
+                    <Input
+                      id="num-acts"
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={numActs}
+                      onChange={(e) => setNumActs(e.target.value ? Number(e.target.value) : '')}
+                      placeholder={difficultyLevel === 'Easy' ? '3' : difficultyLevel === 'Medium' ? '4' : difficultyLevel === 'Hard' ? '5' : '6'}
+                      className="bg-background text-foreground h-9 text-sm"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="num-quests" className="text-xs">Quests/Act</Label>
+                    <Input
+                      id="num-quests"
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={numQuestsPerAct}
+                      onChange={(e) => setNumQuestsPerAct(e.target.value ? Number(e.target.value) : '')}
+                      placeholder={difficultyLevel === 'Easy' ? '3' : difficultyLevel === 'Medium' ? '4' : difficultyLevel === 'Hard' ? '5' : '6'}
+                      className="bg-background text-foreground h-9 text-sm"
+                    />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Label htmlFor="monsters-per-quest" className="text-xs">Monsters/Quest</Label>
+                    <Input
+                      id="monsters-per-quest"
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={monstersPerQuest}
+                      onChange={(e) => setMonstersPerQuest(e.target.value ? Number(e.target.value) : '')}
+                      placeholder={difficultyLevel === 'Easy' ? '2' : difficultyLevel === 'Medium' ? '3' : difficultyLevel === 'Hard' ? '4' : '5'}
+                      className="bg-background text-foreground h-9 text-sm"
+                    />
+                  </div>
                 </div>
                 
-                <div>
-                  <label className="text-sm text-muted-foreground">
-                    Tags (comma-separated)
-                  </label>
-                  <Input
-                    placeholder="e.g., dark-fantasy, dragons, mystery"
-                    value={tags}
-                    onChange={(e) => setTags(e.target.value)}
-                    className="text-foreground"
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="generate-monsters"
+                    checked={generateMonsters}
+                    onCheckedChange={(checked) => setGenerateMonsters(checked === true)}
                   />
+                  <Label htmlFor="generate-monsters" className="text-xs font-normal cursor-pointer">
+                    Generate monsters
+                  </Label>
                 </div>
               </div>
             )}
           </div>
 
-          <Button 
-            onClick={handleGenerate} 
-            className="w-full h-12 text-lg magical-glow hover:shadow-lg transition-all duration-300 hover:scale-105 bg-gradient-to-r from-accent to-accent/80 hover:from-accent/90 hover:to-accent/70"
-            disabled={loading}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Generating Campaign... (this may take 1-2 minutes)
-              </>
-            ) : (
-              "Generate Campaign"
-            )}
-          </Button>
+          {/* Save Option */}
+          <div className="flex items-center space-x-2 pt-2">
+            <Checkbox
+              id="save-to-pinecone"
+              checked={saveToPinecone}
+              onCheckedChange={(checked) => setSaveToPinecone(checked as boolean)}
+            />
+            <Label
+              htmlFor="save-to-pinecone"
+              className="text-xs font-normal cursor-pointer"
+            >
+              Save to library
+            </Label>
+          </div>
+
+              <FantasyButton 
+                onClick={handleGenerate} 
+                variant="rune"
+                size="lg"
+                className="w-full h-12 text-base font-fantasy-heading whitespace-normal px-4"
+                disabled={loading}
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin flex-shrink-0" />
+                    <span className="text-sm">Generating... (1-2 min)</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <span className="text-xl">⚜</span>
+                    <span>Generate Campaign</span>
+                    <span className="text-xl">⚜</span>
+                  </span>
+                )}
+              </FantasyButton>
           </TabsContent>
           
           <TabsContent value="load" className="space-y-4 mt-4">
@@ -299,60 +506,42 @@ const Index = () => {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-accent" />
               </div>
-            ) : savedCampaigns.length === 0 ? (
-              <Card className="p-8 text-center">
-                <Scroll className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">No saved campaigns yet.</p>
-                <p className="text-sm text-muted-foreground mt-2">Generate a new campaign to get started!</p>
-              </Card>
-            ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {savedCampaigns.map((campaign) => (
-                  <Card key={campaign.id} className="p-4 hover:bg-accent/10 transition-colors">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-foreground">{campaign.title}</h3>
-                        <p className="text-sm text-muted-foreground mt-1">{campaign.theme}</p>
-                        <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
-                          {campaign.background}
-                        </p>
-                        {campaign.created_at && (
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Created: {new Date(campaign.created_at).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                      <Button
-                        onClick={() => handleLoadCampaign(campaign.id)}
-                        disabled={loading}
-                        size="sm"
-                        className="ml-4"
-                      >
-                        <Play className="h-4 w-4 mr-2" />
-                        Load
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
+                ) : savedCampaigns.length === 0 ? (
+                  <FantasyCard variant="parchment" className="p-8 text-center">
+                    <Scroll className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground font-fantasy-body">No saved campaigns yet.</p>
+                    <p className="text-sm text-muted-foreground mt-2 font-fantasy-body">Generate a new campaign to get started!</p>
+                  </FantasyCard>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {savedCampaigns.map((campaign) => (
+                      <FantasyCard key={campaign.id} variant="quest" className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-fantasy-heading font-semibold text-foreground break-words">{campaign.title}</h3>
+                            <p className="text-sm text-muted-foreground mt-1 font-fantasy-body">{campaign.theme}</p>
+                            <p className="text-xs text-muted-foreground mt-2 line-clamp-2 font-fantasy-body">
+                              {campaign.background}
+                            </p>
+                            {campaign.created_at && (
+                              <p className="text-xs text-muted-foreground mt-2 font-fantasy-body">
+                                Created: {new Date(campaign.created_at).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </FantasyCard>
+                    ))}
+                  </div>
+                )}
           </TabsContent>
-        </Tabs>
+            </Tabs>
 
-        <div className="border-t pt-6 space-y-2">
-          <h3 className="font-semibold text-sm">What You'll Get:</h3>
-          <ul className="text-sm text-muted-foreground space-y-1">
-            <li>✨ Rich campaign background story with themes</li>
-            <li>📖 3-5 acts with narrative structure</li>
-            <li>🎯 Detailed quests for each act</li>
-            <li>🎲 Ready to play immediately!</li>
-          </ul>
+          </FantasyCardContent>
+        </FantasyCard>
+          </div>
         </div>
-
-        <div className="text-center text-xs text-muted-foreground">
-          <p>Make sure the backend API is running on <code>localhost:8000</code></p>
-        </div>
-      </Card>
+      </div>
     </div>
   );
 };

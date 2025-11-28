@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Play, Trash2, ArrowLeft, Users } from "lucide-react";
+import { Loader2, Plus, Play, Trash2, ArrowLeft, Users, Gamepad2, Home } from "lucide-react";
 import {
   listSessions,
   deleteSession,
@@ -48,6 +48,15 @@ const Sessions = () => {
   useEffect(() => {
     if (isAuthenticated) {
       loadData();
+      
+      // Check if there's a new campaign ID from character creation
+      const newCampaignId = sessionStorage.getItem("newCampaignId");
+      if (newCampaignId) {
+        // Auto-open create dialog and pre-select the campaign
+        setCreateDialogOpen(true);
+        setNewSession(prev => ({ ...prev, campaign_id: parseInt(newCampaignId) }));
+        sessionStorage.removeItem("newCampaignId");
+      }
     }
   }, [isAuthenticated]);
 
@@ -95,9 +104,22 @@ const Sessions = () => {
       setNewSession({ session_name: "", campaign_id: 0, character_ids: [] });
       loadData();
     } catch (error: any) {
+      console.error("Error creating session:", error);
+      // Handle error message properly
+      let errorMessage = "Failed to create session";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "string") {
+        errorMessage = error;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.detail) {
+        errorMessage = error.detail;
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "Failed to create session",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -139,15 +161,21 @@ const Sessions = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/20 p-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/20 p-4 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5"></div>
+      <div className="max-w-6xl mx-auto relative z-10">
+        <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => navigate("/campaign")}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
+            <Button variant="ghost" onClick={() => navigate("/")} className="hover:bg-accent/20">
+              <Home className="mr-2 h-4 w-4" />
+              Home
             </Button>
-            <h1 className="text-3xl font-bold">Game Sessions</h1>
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Game Sessions
+              </h1>
+              <p className="text-muted-foreground mt-1">Manage your D&D gameplay sessions</p>
+            </div>
           </div>
 
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -240,35 +268,43 @@ const Sessions = () => {
         </div>
 
         {sessions.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">No sessions yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Create your first game session to start playing!
-              </p>
-              <Button onClick={() => setCreateDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Session
-              </Button>
-            </CardContent>
+          <Card className="p-12 text-center border-2 border-dashed border-border/50 bg-card/50">
+            <Gamepad2 className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-xl font-semibold mb-2 text-foreground">No Sessions Yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Create a new session to start your adventure!
+            </p>
+            <Button onClick={() => setCreateDialogOpen(true)} className="bg-gradient-to-r from-primary to-primary/80">
+              <Plus className="mr-2 h-4 w-4" />
+              Create Your First Session
+            </Button>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {sessions.map((session) => (
-              <Card key={session.id}>
+              <Card 
+                key={session.id}
+                className="hover:border-primary hover:shadow-lg transition-all bg-gradient-to-br from-card to-card/50 border-2"
+              >
                 <CardHeader>
-                  <CardTitle>{session.session_name}</CardTitle>
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="text-foreground">{session.session_name}</span>
+                    <Gamepad2 className="h-5 w-5 text-primary" />
+                  </CardTitle>
                   <CardDescription>
                     Act {session.current_act_index + 1}, Quest {session.current_quest_index + 1}
                   </CardDescription>
+                  {session.last_played_at && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Last played: {new Date(session.last_played_at).toLocaleDateString()}
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <div className="flex gap-2">
                     <Button
-                      variant="default"
                       onClick={() => handleStartSession(session.id)}
-                      className="flex-1"
+                      className="flex-1 bg-gradient-to-r from-primary to-primary/80"
                     >
                       <Play className="mr-2 h-4 w-4" />
                       Continue
@@ -281,11 +317,6 @@ const Sessions = () => {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  {session.last_played_at && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Last played: {new Date(session.last_played_at).toLocaleDateString()}
-                    </p>
-                  )}
                 </CardContent>
               </Card>
             ))}

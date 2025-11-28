@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { FantasyButton } from '@/components/FantasyButton';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Sword, Shield, Scroll, UserPlus } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { Loader2, Sword, Shield, Scroll, UserPlus, Home } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -48,7 +50,7 @@ const Login: React.FC = () => {
       } else {
         await authLogin(username, password);
       }
-      navigate('/campaign');
+      navigate('/lobby');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Authentication failed';
       setError(errorMessage);
@@ -76,6 +78,24 @@ const Login: React.FC = () => {
       {/* Magical Shine Effect */}
       <div className="absolute inset-0 magical-shine"></div>
       
+      {/* Home Button */}
+      <div className="absolute top-4 left-4 z-20">
+        <FantasyButton
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate("/")}
+          className="font-fantasy-body"
+        >
+          <Home className="h-4 w-4 mr-2" />
+          Home
+        </FantasyButton>
+      </div>
+      
+      {/* Theme Toggle */}
+      <div className="fixed top-4 right-4 z-50">
+        <ThemeToggle />
+      </div>
+      
       <Card className="w-full max-w-md p-8 space-y-6 invisible-boundary magical-glow relative z-10 backdrop-blur-sm bg-card/95">
         {/* Header */}
         <div className="text-center space-y-4">
@@ -84,8 +104,8 @@ const Login: React.FC = () => {
             <Shield className="h-8 w-8 text-accent" />
             <Scroll className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-accent to-accent/80 bg-clip-text text-transparent leading-tight text-no-clip">
-            AgenticTableTop
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-accent to-accent/80 bg-clip-text text-transparent leading-tight text-no-clip whitespace-nowrap">
+            Dungeons & Dragons AI
           </h1>
           <p className="text-lg text-muted-foreground">
             Enter the Realm of Adventure

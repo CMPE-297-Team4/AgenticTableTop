@@ -7,8 +7,10 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import Game from "./pages/Game";
 import Login from "./pages/Login";
+import GameLobby from "./pages/GameLobby";
 import CampaignLibrary from "./pages/CampaignLibrary";
 import CharacterCreate from "./pages/CharacterCreate";
+import Characters from "./pages/Characters";
 import Sessions from "./pages/Sessions";
 import GameSession from "./pages/GameSession";
 import NotFound from "./pages/NotFound";
@@ -41,9 +43,22 @@ const App = () => (
       <AuthProvider>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Login />} />
+            <Route path="/" element={<GameLobby />} />
+            <Route path="/login" element={<Login />} />
+            <Route 
+              path="/lobby" 
+              element={
+                <ProtectedRoute>
+                  <GameLobby />
+                </ProtectedRoute>
+              } 
+            />
             <Route 
               path="/campaign" 
+              element={<Navigate to="/" replace />}
+            />
+            <Route 
+              path="/create-campaign" 
               element={
                 <ProtectedRoute>
                   <Index />
@@ -71,6 +86,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CharacterCreate />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/characters" 
+              element={
+                <ProtectedRoute>
+                  <Characters />
                 </ProtectedRoute>
               } 
             />

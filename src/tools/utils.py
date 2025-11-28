@@ -3,8 +3,6 @@ import random
 import re
 from typing import Any, Dict, List, Optional
 
-from core.state import PlayerCharacter
-
 
 def extract_json_from_response(response: str) -> Optional[str]:
     """
@@ -56,6 +54,9 @@ def load_player_character(json_str: str):
 
     with open("player_character.json", "r", encoding="utf-8") as f:
         player_data = json.load(f)
+    # Import here to avoid circular dependency
+    from core.state import PlayerCharacter
+
     return PlayerCharacter(**player_data)
 
 

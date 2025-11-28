@@ -18,7 +18,7 @@ CharacterGeneratorOutline: "I want a character for a new Dungeons & Dragons camp
 ##########################
 RAG:
   # Enable/disable RAG for all generation tasks
-  enabled: false
+  enabled: true
   
   # Pinecone Configuration
   pinecone:

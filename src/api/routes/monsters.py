@@ -16,6 +16,7 @@ from combat.system import (
 )
 from core.agents import generate_monsters_for_quest
 from core.model import initialize_llm
+from core.monster_agent import MonsterAgent
 from services.cache import cache_response, get_cached_response
 from tools.utils import get_monster_stat_block
 
@@ -169,3 +170,27 @@ async def get_monster_stat_block_endpoint(
     except Exception as e:
         print(f"Error generating stat block: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate stat block: {str(e)}")
+
+
+@router.post("/monster-dialogue")
+async def get_monster_dialogue(
+    monster_data: Dict[str, Any] = Body(...),
+    situation: Dict[str, Any] = Body(...),
+    voice: str = Body("onyx", embed=True),  # Default to deeper voice for monsters
+):
+    """
+    Get monster dialogue with voice audio for non-combat interactions
+    """
+    try:
+        monster_agent = MonsterAgent(use_rag=True)
+        result = monster_agent.decide_non_combat_behavior_with_voice(
+            monster=monster_data,
+            situation=situation,
+            voice=voice,
+        )
+        return result
+    except Exception as e:
+        print(f"Error generating monster dialogue: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate monster dialogue: {str(e)}"
+        )

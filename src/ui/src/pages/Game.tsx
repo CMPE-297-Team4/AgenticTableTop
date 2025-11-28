@@ -144,10 +144,6 @@ const Game = () => {
             <Heart className="mr-2 h-4 w-4" />
             Character Gallery
           </Button>
-          <Button variant="outline" size="sm" onClick={handleBack} className="border-border/50 text-foreground hover:bg-accent/20 hover:text-accent-foreground gaming-glow">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Generator
-          </Button>
           <Button variant="outline" size="sm" onClick={logout} className="border-border/50 text-foreground hover:bg-accent/20 hover:text-accent-foreground gaming-glow">
             <LogOut className="mr-2 h-4 w-4" />
             Logout

@@ -129,7 +129,7 @@ class CombatEncounter:
         self.combat_log = []
         self.is_active = False
         self.monster_data = monster_data or {}  # Map monster names to stat blocks
-        self.monster_agent = MonsterAgent() if monster_data else None
+        self.monster_agent = MonsterAgent(use_rag=True) if monster_data else None
 
         # Sort by initiative (highest first)
         self.initiative_order = sorted(combatants, key=lambda x: x.initiative, reverse=True)

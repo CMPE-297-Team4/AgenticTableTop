@@ -64,6 +64,28 @@ class NPCImage(Base):
     __table_args__ = ({"sqlite_autoincrement": True} if "sqlite" in DATABASE_URL else {},)
 
 
+class MonsterImage(Base):
+    """Monster Image model for storing generated monster portraits"""
+
+    __tablename__ = "monster_images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, index=True, nullable=True)  # Optional: link to user
+    campaign_id = Column(String(100), index=True, nullable=True)  # Optional: link to campaign
+    monster_name = Column(String(200), index=True, nullable=False)
+    monster_type = Column(String(100), nullable=True)
+    monster_description = Column(Text, nullable=True)
+    quest_context = Column(Text, nullable=True)
+    image_base64 = Column(Text, nullable=False)  # Base64 encoded image
+    prompt_used = Column(Text, nullable=True)
+    image_path = Column(String(500), nullable=True)  # Optional: file path if stored on disk
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Index for faster lookups
+    __table_args__ = ({"sqlite_autoincrement": True} if "sqlite" in DATABASE_URL else {},)
+
+
 class Campaign(Base):
     """Campaign model for storing campaign metadata"""
 
@@ -112,6 +134,9 @@ class GameSession(Base):
     user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
     campaign_id = Column(Integer, ForeignKey("campaigns.id"), index=True, nullable=False)
     session_name = Column(String(200), nullable=False)
+    invite_code = Column(
+        String(20), unique=True, index=True, nullable=True
+    )  # Unique invite code for sharing
     current_act_index = Column(Integer, default=0)
     current_quest_index = Column(Integer, default=0)
     session_state = Column(Text, nullable=True)  # JSON string of current game state

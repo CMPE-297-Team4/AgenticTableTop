@@ -16,11 +16,20 @@ class CampaignRequest(BaseModel):
     user_id: Optional[str] = None  # User ID for Pinecone storage
     tags: Optional[List[str]] = []  # Tags for Pinecone storage
     force_new: Optional[bool] = False  # Force new generation, bypass cache
+    # Advanced settings
+    difficulty_level: Optional[str] = "Medium"  # Easy, Medium, Hard, Deadly
+    num_acts: Optional[int] = None  # Number of acts (None = auto based on difficulty)
+    num_quests_per_act: Optional[
+        int
+    ] = None  # Number of quests per act (None = auto based on difficulty)
+    generate_monsters: Optional[bool] = True  # Whether to generate monsters for combat quests
+    monsters_per_quest: Optional[int] = None  # Number of monsters per quest (None = auto 1-3)
 
 
 class CampaignResponse(BaseModel):
     """Response model for campaign generation"""
 
+    id: Optional[int] = None  # Database ID if campaign was saved
     title: str
     background: str
     theme: str
@@ -111,6 +120,24 @@ class NPCImageResponse(BaseModel):
     prompt_used: str
 
 
+class MonsterImageRequest(BaseModel):
+    """Request model for Monster image generation"""
+
+    monster_name: str
+    monster_type: Optional[str] = None
+    monster_description: Optional[str] = None
+    quest_context: Optional[str] = None
+    campaign_id: Optional[str] = None  # optional - link to campaign
+
+
+class MonsterImageResponse(BaseModel):
+    """Response model for Monster image generation"""
+
+    monster_name: str
+    image_base64: str
+    prompt_used: str
+
+
 class MonsterGenerationRequest(BaseModel):
     """Request model for monster generation"""
 
@@ -190,6 +217,14 @@ class PlayerCharacterUpdateRequest(BaseModel):
     experience_points: Optional[int] = None  # Quick XP update
 
 
+class CreateSessionRequest(BaseModel):
+    """Request model for creating a game session"""
+
+    campaign_id: int
+    session_name: str
+    character_ids: List[int]
+
+
 class PlayerActionRequest(BaseModel):
     """Request model for player actions"""
 
@@ -206,3 +241,4 @@ class PlayerActionResponse(BaseModel):
     result: str  # "success", "failure", "partial"
     dm_narration: str  # DM's response to the action
     state_update: Dict[str, Any]  # Updated game state
+    audio_data: Optional[str] = None  # Base64 encoded audio for TTS narration

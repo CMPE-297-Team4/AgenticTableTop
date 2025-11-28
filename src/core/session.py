@@ -29,6 +29,12 @@ class GameSessionState(TypedDict, total=False):
     player_characters: List[Dict[str, Any]]  # Character data for players in session
     player_positions: Dict[str, str]  # Player positions/locations
 
+    # Turn-based gameplay
+    turn_order: List[str]  # List of character names in turn order (includes "DM")
+    current_turn_index: int  # Index in turn_order for whose turn it is
+    current_turn: str  # Character name or "DM" whose turn it is
+    game_started: bool  # Whether the game has been started
+
     # Combat state (if in combat)
     combat_state: Optional[Dict[str, Any]]  # Combat encounter state
     in_combat: bool
@@ -55,6 +61,10 @@ def create_empty_session_state() -> GameSessionState:
         "completed_objectives": [],
         "player_characters": [],
         "player_positions": {},
+        "turn_order": ["DM"],  # DM always goes first
+        "current_turn_index": 0,
+        "current_turn": "DM",
+        "game_started": False,
         "combat_state": None,
         "in_combat": False,
         "narrative_history": [],
@@ -84,6 +94,39 @@ def save_session_state(state: GameSessionState) -> str:
     return json.dumps(state, default=str)
 
 
+def initialize_turn_order(state: GameSessionState) -> GameSessionState:
+    """Initialize turn order with DM first, then players"""
+    # DM always goes first
+    turn_order = ["DM"]
+
+    # Add all player characters to turn order
+    for char in state.get("player_characters", []):
+        char_name = char.get("character_name", "")
+        if char_name and char_name not in turn_order:
+            turn_order.append(char_name)
+
+    state["turn_order"] = turn_order
+    state["current_turn_index"] = 0
+    state["current_turn"] = turn_order[0] if turn_order else "DM"
+
+    return state
+
+
+def next_turn(state: GameSessionState) -> GameSessionState:
+    """Move to the next turn in the turn order"""
+    turn_order = state.get("turn_order", ["DM"])
+    if not turn_order:
+        return state
+
+    current_index = state.get("current_turn_index", 0)
+    next_index = (current_index + 1) % len(turn_order)
+
+    state["current_turn_index"] = next_index
+    state["current_turn"] = turn_order[next_index]
+
+    return state
+
+
 def add_narrative_event(
     state: GameSessionState,
     event_type: str,
@@ -91,12 +134,23 @@ def add_narrative_event(
     metadata: Optional[Dict[str, Any]] = None,
 ) -> GameSessionState:
     """Add a narrative event to the history"""
-    from datetime import datetime
+    from datetime import datetime, timedelta
+
+    # Ensure unique timestamps by adding microseconds if needed
+    timestamp = datetime.utcnow()
+
+    # If there's a previous event, ensure this timestamp is after it
+    if "narrative_history" in state and state["narrative_history"]:
+        last_event = state["narrative_history"][-1]
+        last_timestamp = datetime.fromisoformat(last_event["timestamp"].replace("Z", "+00:00"))
+        if timestamp <= last_timestamp:
+            # Add 1 microsecond to ensure chronological order
+            timestamp = last_timestamp + timedelta(microseconds=1)
 
     event = {
         "type": event_type,  # "dm_narration", "player_action", "combat_event", etc.
         "content": content,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": timestamp.isoformat() + "Z",  # Add Z for UTC
     }
 
     if metadata:
@@ -106,6 +160,8 @@ def add_narrative_event(
         state["narrative_history"] = []
 
     state["narrative_history"].append(event)
+
+    print(f"📝 Added {event_type} event at {event['timestamp']}: {content[:50]}...")
 
     # Keep only last 100 events to prevent unbounded growth
     if len(state["narrative_history"]) > 100:

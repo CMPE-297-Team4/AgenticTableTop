@@ -2,9 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import fantasy enhancements */
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
+
+/* Fantasy font utilities - Must be defined before @layer base uses them */
+@layer utilities {
+  .font-fantasy-title {
+    font-family: 'Cinzel', 'Times New Roman', serif;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    word-spacing: 0.05em;
+    color: hsl(var(--foreground));
+  }
+
+  .font-fantasy-heading {
+    font-family: 'Cinzel', 'Times New Roman', serif;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    word-spacing: 0.04em;
+    color: hsl(var(--foreground));
+  }
+
+  .font-fantasy-body {
+    font-family: 'Cinzel', 'Times New Roman', serif;
+    letter-spacing: 0.02em;
+    line-height: 1.7;
+    word-spacing: 0.03em;
+    color: hsl(var(--foreground));
+  }
+}
 
 @layer base {
   :root {
@@ -92,6 +121,45 @@ All colors MUST be HSL.
     --sidebar-border: 220 15% 12%;
     --sidebar-ring: 220 70% 55%;
   }
+
+  .light {
+    /* Light Fantasy Theme - Parchment & Gold */
+    --background: 45 20% 98%;
+    --foreground: 25 15% 5%;
+
+    --card: 45 15% 99%;
+    --card-foreground: 25 15% 8%;
+
+    --popover: 45 15% 97%;
+    --popover-foreground: 25 15% 8%;
+
+    --primary: 35 75% 35%;
+    --primary-foreground: 45 20% 98%;
+
+    --secondary: 45 10% 90%;
+    --secondary-foreground: 25 15% 12%;
+
+    --muted: 45 10% 94%;
+    --muted-foreground: 25 10% 25%;
+
+    --accent: 35 65% 40%;
+    --accent-foreground: 45 20% 98%;
+
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 45 15% 75%;
+    --input: 45 10% 92%;
+    --ring: 35 75% 35%;
+    --sidebar-background: 45 15% 95%;
+    --sidebar-foreground: 25 15% 8%;
+    --sidebar-primary: 35 75% 35%;
+    --sidebar-primary-foreground: 45 20% 98%;
+    --sidebar-accent: 35 65% 40%;
+    --sidebar-accent-foreground: 45 20% 98%;
+    --sidebar-border: 45 15% 75%;
+    --sidebar-ring: 35 75% 35%;
+  }
 }
 
 @layer base {
@@ -100,7 +168,12 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-fantasy-body;
+  }
+  
+  /* Apply fantasy font to all text elements */
+  h1, h2, h3, h4, h5, h6, p, span, div, a, button, input, textarea, select, label, nav, header, footer, li, ul, ol, td, th, table {
+    @apply font-fantasy-body;
   }
   
   /* Gaming-specific enhancements */
@@ -363,6 +436,159 @@ All colors MUST be HSL.
   .main-content::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--accent) / 0.5);
   }
+  
+  /* Dice Rolling Animation */
+  @keyframes dice-roll {
+    0% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(90deg) scale(1.1); }
+    50% { transform: rotate(180deg) scale(0.9); }
+    75% { transform: rotate(270deg) scale(1.1); }
+    100% { transform: rotate(360deg) scale(1); }
+  }
+  
+  .dice-rolling {
+    animation: dice-roll 0.5s ease-in-out infinite;
+  }
+  
+  /* Shine animation for health bars */
+  @keyframes shine {
+    0% {
+      transform: translateX(-100%) skewX(-15deg);
+    }
+    100% {
+      transform: translateX(200%) skewX(-15deg);
+    }
+  }
+  
+  .animate-shine {
+    animation: shine 2s ease-in-out infinite;
+  }
+  
+  /* Pulse glow for low health */
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 10px hsl(var(--destructive) / 0.5);
+    }
+    50% {
+      box-shadow: 0 0 20px hsl(var(--destructive) / 0.8);
+    }
+  }
+  
+  .pulse-glow {
+    animation: pulse-glow 1.5s ease-in-out infinite;
+  }
+  
+  /* Turn indicator pulse */
+  @keyframes turn-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.8;
+    }
+  }
+  
+  .turn-active {
+    animation: turn-pulse 2s ease-in-out infinite;
+  }
+  
+  /* Success animation */
+  @keyframes success-pop {
+    0% {
+      transform: scale(0.8);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  
+  .success-pop {
+    animation: success-pop 0.5s ease-out;
+  }
+  
+  /* Game button styling */
+  .game-button {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+  
+  .game-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent
+    );
+    transition: left 0.5s;
+  }
+  
+  .game-button:hover::before {
+    left: 100%;
+  }
+  
+  .game-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+  }
+  
+  .game-button:active {
+    transform: translateY(0);
+  }
+  
+  /* Quest card glow */
+  .quest-glow {
+    box-shadow: 
+      0 0 10px hsl(var(--accent) / 0.3),
+      0 0 20px hsl(var(--accent) / 0.2),
+      0 0 30px hsl(var(--accent) / 0.1);
+  }
+  
+  /* Character card hover effect */
+  .character-card-hover {
+    transition: all 0.3s ease;
+  }
+  
+  .character-card-hover:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 
+      0 10px 30px hsl(var(--primary) / 0.3),
+      0 0 20px hsl(var(--primary) / 0.2);
+  }
+  
+  /* XP bar gradient */
+  .xp-gradient {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--yellow-500)),
+      hsl(var(--yellow-400)),
+      hsl(var(--yellow-500))
+    );
+    background-size: 200% 100%;
+    animation: xp-flow 3s linear infinite;
+  }
+  
+  @keyframes xp-flow {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 200% 50%;
+    }
+  }
 
   /* Sidebar button fixes */
   .sidebar-button {
@@ -390,3 +616,4 @@ All colors MUST be HSL.
     overflow: hidden;
   }
 }
+

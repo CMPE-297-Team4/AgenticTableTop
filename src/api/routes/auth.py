@@ -10,6 +10,9 @@ from api.auth import create_access_token, get_password_hash, verify_password
 from api.dependencies import get_current_user
 from api.models import Token, UserRegister, UserResponse
 from database.models import User, get_db
+from tools.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
@@ -35,6 +38,17 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
 
     # Create new user
     hashed_password = get_password_hash(user_data.password)
+    logger.info(
+        "Registering new user",
+        extra={
+            "extra_fields": {
+                "username": user_data.username,
+                "email": user_data.email,
+                "hashed_password_prefix": hashed_password[:30],
+            }
+        },
+    )
+
     new_user = User(
         username=user_data.username,
         email=user_data.email,
@@ -44,6 +58,19 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    # Verify the password was stored correctly
+    verify_test = verify_password(user_data.password, new_user.hashed_password)
+    logger.info(
+        "Registration complete",
+        extra={
+            "extra_fields": {
+                "username": user_data.username,
+                "user_id": new_user.id,
+                "password_verification_test": verify_test,
+            }
+        },
+    )
 
     return UserResponse(
         id=new_user.id,
@@ -59,7 +86,35 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     # Find user by username
     user = db.query(User).filter(User.username == form_data.username).first()
 
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user:
+        logger.warning(
+            "Login failed: user not found",
+            extra={"extra_fields": {"username": form_data.username}},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Verify password
+    password_valid = verify_password(form_data.password, user.hashed_password)
+    logger.info(
+        "Login attempt",
+        extra={
+            "extra_fields": {
+                "username": form_data.username,
+                "user_id": user.id,
+                "password_valid": password_valid,
+            }
+        },
+    )
+
+    if not password_valid:
+        logger.warning(
+            "Login failed: password verification failed",
+            extra={"extra_fields": {"username": form_data.username, "user_id": user.id}},
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -74,6 +129,11 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 
     # Create access token (sub must be a string)
     access_token = create_access_token(data={"sub": str(user.id)})
+
+    logger.info(
+        "Login successful",
+        extra={"extra_fields": {"username": user.username, "user_id": user.id}},
+    )
 
     return Token(
         access_token=access_token,

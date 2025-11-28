@@ -373,14 +373,15 @@ def generate_player_character(
         ]
 
         # Generate character using OpenAI
+        # Force the model to call save_character first
         response = client.chat.completions.create(
             model="gpt-4o",
             tools=tools,
-            tool_choice="auto",
+            tool_choice={"type": "function", "function": {"name": "save_character"}},
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a structured DnD character generator. Only respond by calling tools or returning valid JSON.",
+                    "content": "You are a structured DnD character generator. You must call save_character first with the complete character data. Do not call generate_portrait - that will be handled separately.",
                 },
                 {
                     "role": "system",
@@ -396,13 +397,49 @@ def generate_player_character(
                 "error": "Model did not call save_character. Check schema/fields or loosen constraints."
             }
 
-        # Extract character from tool call
-        tool_call = message.tool_calls[0]
-        if tool_call.function.name != "save_character":
-            return {"error": f"Expected save_character call, got {tool_call.function.name}"}
+        # Find the save_character tool call (should be first, but check all)
+        save_character_call = None
+        for tool_call in message.tool_calls:
+            if tool_call.function.name == "save_character":
+                save_character_call = tool_call
+                break
 
-        args = json.loads(tool_call.function.arguments)
+        if not save_character_call:
+            # If no save_character call found, check what was called
+            called_names = [tc.function.name for tc in message.tool_calls]
+            return {"error": f"Expected save_character call, got {', '.join(called_names)}"}
+
+        args = json.loads(save_character_call.function.arguments)
         character = args["character"]
+
+        # Generate proper stats based on race and class
+        from services.stat_generation import (
+            calculate_armor_class,
+            calculate_hp,
+            generate_ability_scores,
+        )
+
+        stats = generate_ability_scores(race, class_and_level)
+        character["strength"] = stats["strength"]
+        character["dexterity"] = stats["dexterity"]
+        character["constitution"] = stats["constitution"]
+        character["intelligence"] = stats["intelligence"]
+        character["wisdom"] = stats["wisdom"]
+        character["charisma"] = stats["charisma"]
+
+        # Extract level from class_and_level (e.g., "Fighter 1" -> 1)
+        level = 1
+        if " " in class_and_level:
+            try:
+                level = int(class_and_level.split(" ")[1])
+            except (IndexError, ValueError):
+                level = 1
+
+        # Calculate HP based on class, level, and constitution
+        character["hit_points"] = calculate_hp(class_and_level, level, stats["constitution"])
+
+        # Calculate AC based on dexterity (assuming no armor for now)
+        character["armor_class"] = calculate_armor_class(stats["dexterity"], armor_bonus=0)
 
         # Generate portrait prompt
         prompt_gen = client.chat.completions.create(

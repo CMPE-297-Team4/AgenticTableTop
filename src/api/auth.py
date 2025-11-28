@@ -11,6 +11,10 @@ from typing import Optional
 import bcrypt
 from jose import JWTError, jwt
 
+from tools.logger import setup_logger
+
+logger = setup_logger(__name__)
+
 # JWT Configuration
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
@@ -70,9 +74,14 @@ def decode_access_token(token: str) -> Optional[dict]:
         return payload
     except JWTError as e:
         # Log the error for debugging
-        print(f"JWT decode error: {str(e)}")
+        logger.error(
+            "JWT decode error", extra={"extra_fields": {"error": str(e), "error_type": "JWTError"}}
+        )
         return None
     except Exception as e:
         # Log any other errors
-        print(f"Unexpected error decoding token: {str(e)}")
+        logger.error(
+            "Unexpected error decoding token",
+            extra={"extra_fields": {"error": str(e), "error_type": type(e).__name__}},
+        )
         return None

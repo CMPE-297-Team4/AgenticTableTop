@@ -1,4 +1,4 @@
-.PHONY: help test format setup run clean coverage install install-dev install-all lint check api frontend start-all
+.PHONY: help test format setup run clean clean-pinecone clean-all coverage install install-dev install-all lint check api frontend start-all fix-characters
 
 # Default target - show help
 help:
@@ -25,8 +25,12 @@ help:
 	@echo "  make start-all      - Start both backend and frontend"
 	@echo ""
 	@echo "Cleanup Commands:"
-	@echo "  make clean          - Remove generated files and caches"
-	@echo "  make clean-all      - Deep clean (includes venv, if managed)"
+	@echo "  make clean          - Remove ALL local storage (database, cache, images, logs)"
+	@echo "  make clean-pinecone - Remove Pinecone vector storage (cloud)"
+	@echo "  make clean-all      - Deep clean (local storage + venv + node_modules)"
+	@echo ""
+	@echo "Utility Commands:"
+	@echo "  make fix-characters - Fix stats for existing characters (regenerate based on race/class)"
 	@echo ""
 
 # Installation targets
@@ -91,9 +95,13 @@ frontend:
 start-all:
 	@bash scripts/start-all.sh
 
-# Clean up generated files
+# Clean up generated files and database
 clean:
-	@echo "Cleaning up generated files..."
+	@echo "==================================="
+	@echo "Cleaning AgenticTableTop Storage"
+	@echo "==================================="
+	@echo ""
+	@echo "[1/7] Cleaning Python artifacts..."
 	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@find . -type f -name "*.pyo" -delete 2>/dev/null || true
@@ -102,7 +110,69 @@ clean:
 	@rm -rf htmlcov 2>/dev/null || true
 	@rm -rf .coverage 2>/dev/null || true
 	@rm -rf dist build 2>/dev/null || true
-	@echo "Cleanup complete!"
+	@echo "    ✓ Python artifacts cleaned"
+	@echo ""
+	@echo "[2/7] Cleaning database files..."
+	@rm -f agentictabletop.db 2>/dev/null || true
+	@rm -f src/agentictabletop.db 2>/dev/null || true
+	@rm -f *.db 2>/dev/null || true
+	@rm -f src/*.db 2>/dev/null || true
+	@rm -f *.db-journal 2>/dev/null || true
+	@rm -f src/*.db-journal 2>/dev/null || true
+	@echo "    ✓ Database files cleaned"
+	@echo ""
+	@echo "[3/7] Cleaning LLM cache..."
+	@rm -rf cache/llm_responses/*.json 2>/dev/null || true
+	@rm -rf cache/llm_responses/ 2>/dev/null || true
+	@rm -rf src/cache/llm_responses/*.json 2>/dev/null || true
+	@rm -rf src/cache/ 2>/dev/null || true
+	@echo "    ✓ LLM cache cleaned"
+	@echo ""
+	@echo "[4/7] Cleaning character images and portraits..."
+	@rm -rf characters/*.png 2>/dev/null || true
+	@rm -rf characters/ 2>/dev/null || true
+	@echo "    ✓ Character images cleaned"
+	@echo ""
+	@echo "[5/7] Cleaning trajectory logs..."
+	@rm -rf src/trajectory/*.log 2>/dev/null || true
+	@echo "    ✓ Trajectory logs cleaned"
+	@echo ""
+	@echo "[6/7] Cleaning log files..."
+	@rm -f backend.log 2>/dev/null || true
+	@rm -f frontend.log 2>/dev/null || true
+	@rm -f *.log 2>/dev/null || true
+	@echo "    ✓ Log files cleaned"
+	@echo ""
+	@echo "[7/7] Cleaning frontend build artifacts..."
+	@rm -rf src/ui/dist/ 2>/dev/null || true
+	@rm -rf src/ui/node_modules/.vite/ 2>/dev/null || true
+	@echo "    ✓ Frontend artifacts cleaned"
+	@echo ""
+	@echo "==================================="
+	@echo "⚠️  NOTE: Pinecone vector storage is cloud-based and NOT cleaned by this command."
+	@echo "   To clear Pinecone data, manually delete indexes via Pinecone dashboard:"
+	@echo "   https://app.pinecone.io"
+	@echo "==================================="
+	@echo ""
+	@echo "✅ Cleanup complete!"
+
+# Clean Pinecone vector storage (cloud-based)
+clean-pinecone:
+	@bash scripts/clean_pinecone.sh
+
+# Fix character stats (regenerate based on race and class)
+fix-characters:
+	@echo "====================================="
+	@echo "Fixing Character Stats"
+	@echo "====================================="
+	@echo ""
+	@echo "This will regenerate stats for all existing characters"
+	@echo "based on their race and class using D&D 5e rules."
+	@echo ""
+	@python scripts/fix_character_stats.py
+	@echo ""
+	@echo "✅ Done! Refresh your browser to see updated stats."
+	@echo ""
 
 # Deep clean (includes removing venv if present)
 clean-all: clean
@@ -110,5 +180,7 @@ clean-all: clean
 	@rm -rf venv 2>/dev/null || true
 	@rm -rf .venv 2>/dev/null || true
 	@rm -rf env 2>/dev/null || true
+	@rm -rf node_modules 2>/dev/null || true
+	@rm -rf src/ui/node_modules 2>/dev/null || true
 	@echo "Deep clean complete!"
 
