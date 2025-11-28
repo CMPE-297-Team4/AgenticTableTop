@@ -61,9 +61,13 @@ echo ""
 echo "Press Ctrl+C to stop the server"
 echo ""
 
-# Add src/ to PYTHONPATH so modules can be imported
-export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
+# Save the project root for later
+PROJECT_ROOT="$(pwd)"
 
-# Start the API using uvicorn directly (more stable for background execution)
-# Using module format allows for better process management
-uvicorn api:app --host 0.0.0.0 --port 8000 --log-level info
+# Add src/ to PYTHONPATH so modules can be imported
+export PYTHONPATH="${PYTHONPATH}:${PROJECT_ROOT}/src"
+
+# Start the API using uvicorn directly
+# Change to src/ directory to avoid api.py name conflict, then run uvicorn
+cd "${PROJECT_ROOT}/src"
+python -m uvicorn api.server:app --host 0.0.0.0 --port 8000 --log-level info

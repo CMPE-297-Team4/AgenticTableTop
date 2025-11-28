@@ -1,18 +1,22 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file in project root
+env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # LLM Configuration
 # These settings control the connection and behavior of the Large Language Model API
 # Please fill in your own API information below
-MODEL_TYPE = "GEMINI"  # OPENAI or GEMINI
-API_BASE = "https://gemini.google.com/v1"  # "https://api.openai.com/v1" or "https://gemini.google.com/v1" etc
-MODEL = "gemini-2.5-flash"  # "gpt-4o-mini" or "gemini-2.5-flash" etc
+MODEL_TYPE = "OPENAI"  # OPENAI or GEMINI
+API_BASE = (
+    "https://api.openai.com/v1"  # "https://api.openai.com/v1" or "https://gemini.google.com/v1" etc
+)
+MODEL = "gpt-4o-mini"  # "gpt-4o-mini" or "gemini-2.5-flash" etc
 LLM_REQUEST_TIMEOUT = 60
 TEMPERATURE = 0.7  # The temperature of the model: the lower the value, the more consistent the output of the model
 OPENAI_MAX_TOKENS = 3000  # The max token limit for the response completion

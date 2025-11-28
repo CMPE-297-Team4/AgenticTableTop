@@ -39,11 +39,26 @@ async def health_check():
 
 
 # Include all route modules
-from api.routes import auth, cache, campaigns, monsters, npcs, search  # noqa: E402
+from api.routes import (  # noqa: E402
+    auth,
+    cache,
+    campaigns,
+    characters,
+    dm,
+    monster_images,
+    monsters,
+    npcs,
+    search,
+    sessions,
+)
 
 app.include_router(auth.router)
 app.include_router(cache.router)
 app.include_router(campaigns.router)
+app.include_router(characters.router)
+app.include_router(dm.router)
+app.include_router(monster_images.router)
 app.include_router(monsters.router)
 app.include_router(npcs.router)
 app.include_router(search.router)
+app.include_router(sessions.router)

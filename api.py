@@ -2,7 +2,7 @@
 FastAPI Backend for AgenticTableTop
 Provides REST API endpoints for the UI to interact with D&D content generation
 
-This file now imports the modular API structure from api.server
+This file now imports the modular API structure from src/api/server
 """
 
 import sys
@@ -19,7 +19,19 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv()
 
 # Import the modular API app
-from api.server import app  # noqa: E402
+# We need to temporarily remove 'api' from sys.modules if it exists (this file)
+# to avoid name conflicts when importing the api package from src/
+_api_module_backup = None
+if "api" in sys.modules and sys.modules["api"].__file__ == __file__:
+    _api_module_backup = sys.modules.pop("api")
+
+try:
+    # Now we can import the api package from src/
+    from api.server import app  # noqa: E402
+finally:
+    # Restore the api module (this file) if we removed it
+    if _api_module_backup is not None:
+        sys.modules["api"] = _api_module_backup
 
 if __name__ == "__main__":
     import uvicorn

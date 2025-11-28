@@ -65,13 +65,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const handleRegister = async (username: string, email: string, password: string) => {
     try {
-      await register({ username, email, password });
-      // After registration, automatically log in
-      await handleLogin(username, password);
-      toast.success(`Account created! Welcome, ${username}!`);
+      // Register the user
+      const userInfo = await register({ username, email, password });
+      
+      // Registration successful - show success message
+      // User will need to log in manually using the login form
+      toast.success(`Account created successfully! Please log in to continue.`);
+      
+      // Don't automatically log in - let user log in manually
+      // This avoids potential issues with auto-login failing after registration
     } catch (err) {
+      // Registration failed
       const errorMessage = err instanceof Error ? err.message : 'Registration failed';
-      toast.error(errorMessage);
+      
+      // Check if it's a network error or actual registration error
+      if (errorMessage.includes('Cannot connect to backend')) {
+        toast.error('Cannot connect to server. Please make sure the backend is running.');
+      } else if (errorMessage.includes('already registered')) {
+        toast.error(errorMessage);
+      } else {
+        toast.error(`Registration failed: ${errorMessage}`);
+      }
       throw err;
     }
   };

@@ -12,12 +12,26 @@ from sqlalchemy.orm import Session
 
 from api.dependencies import get_current_user
 from api.models import CampaignRequest, CampaignResponse, SaveCampaignRequest, StoryResponse
-from core.agents import background_story, generate_game_plan, generate_quests_for_act
+from core.agents import (
+    background_story_with_rag,
+    generate_game_plan_with_rag,
+    generate_monsters_for_combat_quests,
+    generate_quests_for_act_with_rag,
+)
 from core.model import initialize_llm
 from core.state import GameStatus
 from database.models import Campaign, User, get_db
 from services.cache import cache_response, get_cached_response
 from services.pinecone import pinecone_service
+
+# Optional RAG service import
+try:
+    from services.rag import get_rag_service
+
+    _rag_available = True
+except ImportError:
+    get_rag_service = None  # type: ignore
+    _rag_available = False
 
 router = APIRouter(prefix="/api", tags=["campaigns"])
 
@@ -65,15 +79,98 @@ async def generate_campaign(
         model = initialize_llm()
         state = GameStatus()
 
-        # Generate background story
-        background_story(model, state)
+        # Initialize RAG service if available
+        rag_service = None
+        if _rag_available:
+            try:
+                rag_service = get_rag_service()
+            except Exception as e:
+                print(f"Warning: RAG service not available: {e}")
+                rag_service = None
 
-        # Generate game plan (acts)
-        generate_game_plan(model, state)
+        # Determine number of acts, quests, and monsters based on difficulty
+        difficulty = request.difficulty_level or "Medium"
+        num_acts = request.num_acts
+        num_quests_per_act = request.num_quests_per_act
+        monsters_per_quest = request.monsters_per_quest
 
-        # Generate quests for each act
+        # Auto-determine based on difficulty if not specified
+        # Number of Acts
+        if num_acts is None:
+            difficulty_map_acts = {
+                "Easy": 3,
+                "Medium": 4,
+                "Hard": 5,
+                "Deadly": 6,
+            }
+            num_acts = difficulty_map_acts.get(difficulty, 4)
+
+        # Maximum Quests per Act
+        if num_quests_per_act is None:
+            difficulty_map_quests = {
+                "Easy": 3,
+                "Medium": 4,
+                "Hard": 5,
+                "Deadly": 6,
+            }
+            num_quests_per_act = difficulty_map_quests.get(difficulty, 4)
+
+        # Maximum Monsters per Quest (for combat quests)
+        if monsters_per_quest is None:
+            difficulty_map_monsters = {
+                "Easy": 2,  # Easy: 1-2 monsters per combat quest
+                "Medium": 3,  # Medium: 1-3 monsters per combat quest
+                "Hard": 4,  # Hard: 2-4 monsters per combat quest
+                "Deadly": 5,  # Deadly: 3-5 monsters per combat quest
+            }
+            monsters_per_quest = difficulty_map_monsters.get(difficulty, 3)
+
+        print(f"Campaign Difficulty: {difficulty}")
+        print(f"  - Number of Acts: {num_acts}")
+        print(f"  - Max Quests per Act: {num_quests_per_act}")
+        print(f"  - Max Monsters per Quest: {monsters_per_quest}")
+
+        # Replace placeholders in outline with actual values
+        outline = request.outline
+        outline = outline.replace("{num_acts}", str(num_acts))
+        outline = outline.replace("{num_quests}", str(num_quests_per_act))
+        outline = outline.replace("{num_monsters}", str(monsters_per_quest))
+
+        # Store the processed outline in state for use by generation functions
+        state["user_outline"] = outline
+
+        # Generate background story with RAG
+        background_story_with_rag(model, state, rag_service, "campaign-setting")
+
+        # Generate game plan (acts) with RAG
+        generate_game_plan_with_rag(model, state, rag_service, "campaign-rules", num_acts=num_acts)
+
+        # Limit acts to requested number if generated more
+        if len(state.get("acts", [])) > num_acts:
+            state["acts"] = state["acts"][:num_acts]
+
+        # Generate quests for each act with RAG
         for i in range(len(state["acts"])):
-            generate_quests_for_act(model, state, i)
+            generate_quests_for_act_with_rag(
+                model, state, i, rag_service, "campaign-rules", num_quests=num_quests_per_act
+            )
+
+        # Limit quests per act to requested number
+        for act_title in state.get("quests", {}):
+            if len(state["quests"][act_title]) > num_quests_per_act:
+                state["quests"][act_title] = state["quests"][act_title][:num_quests_per_act]
+
+        # Generate monsters for combat quests if requested
+        if request.generate_monsters:
+            print("Generating monsters for combat quests...")
+            print(
+                f"Using max {monsters_per_quest} monsters per quest (based on {difficulty} difficulty)"
+            )
+            # Get campaign theme from state
+            campaign_theme = state.get("key_themes", [""])[0] if state.get("key_themes") else ""
+            generate_monsters_for_combat_quests(
+                model, state, monsters_per_quest=monsters_per_quest, campaign_theme=campaign_theme
+            )
 
         # Calculate totals
         total_quests = sum(len(quests) for quests in state.get("quests", {}).values())
@@ -116,7 +213,31 @@ async def generate_campaign(
                 transformed_quest_list.append(transformed_quest)
             transformed_quests[act_title] = transformed_quest_list
 
+        # Always save to database for user first
+        campaign_db = Campaign(
+            user_id=current_user.id,
+            title=state.get("title", DEFAULT_CAMPAIGN_TITLE),
+            background=state.get("background_story", ""),
+            theme=state.get("key_themes", [""])[0] if state.get("key_themes") else "",
+            campaign_data=json.dumps(
+                {
+                    "title": state.get("title", DEFAULT_CAMPAIGN_TITLE),
+                    "background": state.get("background_story", ""),
+                    "theme": state.get("key_themes", [""])[0] if state.get("key_themes") else "",
+                    "acts": transformed_acts,
+                    "quests": transformed_quests,
+                }
+            ),
+        )
+        db.add(campaign_db)
+        db.commit()
+        db.refresh(campaign_db)
+        campaign_id = str(campaign_db.id)
+        print(f"Campaign saved to database with ID: {campaign_id}")
+
+        # Create response with ID from database
         campaign_response = CampaignResponse(
+            id=campaign_db.id,  # Include database ID
             title=state.get("title", DEFAULT_CAMPAIGN_TITLE),
             background=state.get("background_story", ""),
             theme=state.get("key_themes", [""])[0] if state.get("key_themes") else "",
@@ -130,20 +251,6 @@ async def generate_campaign(
         if cache_enabled:
             cache_response(cache_key, campaign_response.dict(), "campaign")
             print(f"Cached campaign response for: {request.outline[:50]}...")
-
-        # Always save to database for user
-        campaign_db = Campaign(
-            user_id=current_user.id,
-            title=campaign_response.title,
-            background=campaign_response.background,
-            theme=campaign_response.theme,
-            campaign_data=json.dumps(campaign_response.dict()),
-        )
-        db.add(campaign_db)
-        db.commit()
-        db.refresh(campaign_db)
-        campaign_id = str(campaign_db.id)
-        print(f"Campaign saved to database with ID: {campaign_id}")
 
         # Optionally save to Pinecone if requested
         if request.save_to_pinecone:
@@ -225,8 +332,17 @@ async def generate_story_only(request: CampaignRequest):
         model = initialize_llm()
         state = GameStatus()
 
+        # Initialize RAG service if available
+        rag_service = None
+        if _rag_available:
+            try:
+                rag_service = get_rag_service()
+            except Exception as e:
+                print(f"Warning: RAG service not available: {e}")
+                rag_service = None
+
         # Generate only the background story
-        background_story(model, state)
+        background_story_with_rag(model, state, rag_service, "campaign-setting")
 
         # Create response
         response_data = {
@@ -273,9 +389,18 @@ async def generate_game_plan_only(request: CampaignRequest):
         model = initialize_llm()
         state = GameStatus()
 
+        # Initialize RAG service if available
+        rag_service = None
+        if _rag_available:
+            try:
+                rag_service = get_rag_service()
+            except Exception as e:
+                print(f"Warning: RAG service not available: {e}")
+                rag_service = None
+
         # Generate story and game plan
-        background_story(model, state)
-        generate_game_plan(model, state)
+        background_story_with_rag(model, state, rag_service, "campaign-setting")
+        generate_game_plan_with_rag(model, state, rag_service, "campaign-rules")
 
         # Transform acts to match frontend interface
         transformed_acts = []

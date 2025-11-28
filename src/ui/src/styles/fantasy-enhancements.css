@@ -1,0 +1,751 @@
+/**
+ * Fantasy UI/UX Enhancements for D&D Game Interface
+ * 
+ * This file contains all the enhanced styling for a more immersive,
+ * gamified D&D experience with medieval/fantasy theming.
+ */
+
+/* ============================================
+   FANTASY TYPOGRAPHY SYSTEM
+   ============================================ */
+
+/* Import fantasy fonts via Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cinzel+Decorative:wght@400;700&family=MedievalSharp&family=Uncial+Antiqua&display=swap');
+
+/* Note: Font utility classes (.font-fantasy-title, .font-fantasy-heading, .font-fantasy-body) 
+   are defined in index.css within @layer utilities to ensure they're available when @apply is used */
+
+.font-fantasy-script {
+  font-family: 'Uncial Antiqua', cursive;
+  letter-spacing: 0.1em;
+}
+
+.font-fantasy-runes {
+  font-family: 'MedievalSharp', cursive;
+  letter-spacing: 0.15em;
+}
+
+/* Text shadows for mystical effect */
+.text-mystical {
+  text-shadow: 
+    0 0 10px hsl(var(--accent) / 0.5),
+    0 0 20px hsl(var(--primary) / 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.text-glow-primary {
+  text-shadow: 
+    0 0 8px hsl(var(--primary) / 0.8),
+    0 0 16px hsl(var(--primary) / 0.6),
+    0 0 24px hsl(var(--primary) / 0.4);
+}
+
+.text-glow-accent {
+  text-shadow: 
+    0 0 8px hsl(var(--accent) / 0.8),
+    0 0 16px hsl(var(--accent) / 0.6),
+    0 0 24px hsl(var(--accent) / 0.4);
+}
+
+/* ============================================
+   PARCHMENT TEXTURES & BORDERS
+   ============================================ */
+
+/* Parchment background texture */
+.parchment-bg {
+  background-image: 
+    url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, 
+      hsl(var(--card) / 0.95) 0%,
+      hsl(var(--muted) / 0.9) 50%,
+      hsl(var(--card) / 0.95) 100%
+    );
+  background-size: 200px 200px, 100% 100%;
+  position: relative;
+}
+
+.parchment-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 20% 30%, rgba(139, 90, 43, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(101, 67, 33, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* Medieval border styles */
+.border-medieval {
+  border: 3px solid;
+  border-image: linear-gradient(
+    135deg,
+    hsl(var(--accent) / 0.6),
+    hsl(var(--primary) / 0.4),
+    hsl(var(--accent) / 0.6)
+  ) 1;
+  position: relative;
+}
+
+.border-medieval::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 1px solid hsl(var(--accent) / 0.3);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.border-scroll {
+  border: 4px double hsl(var(--accent) / 0.5);
+  border-radius: 8px;
+  box-shadow: 
+    inset 0 0 20px hsl(var(--accent) / 0.1),
+    0 0 20px hsl(var(--accent) / 0.2);
+}
+
+/* Scroll unfurl animation */
+@keyframes scroll-unfurl {
+  0% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scaleY(0.5);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.scroll-unfurl {
+  animation: scroll-unfurl 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: top;
+}
+
+/* ============================================
+   ENHANCED BUTTON STYLES
+   ============================================ */
+
+/* Fantasy button base */
+.btn-fantasy {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid hsl(var(--accent) / 0.6);
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.2),
+    hsl(var(--accent) / 0.15)
+  );
+  box-shadow: 
+    0 4px 15px hsl(var(--primary) / 0.3),
+    inset 0 1px 0 hsl(var(--primary) / 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: hsl(var(--foreground));
+}
+
+.btn-fantasy::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.btn-fantasy:hover {
+  transform: translateY(-2px);
+  border-color: hsl(var(--accent));
+  box-shadow: 
+    0 8px 25px hsl(var(--primary) / 0.5),
+    0 0 30px hsl(var(--accent) / 0.4),
+    inset 0 1px 0 hsl(var(--primary) / 0.3);
+}
+
+.btn-fantasy:hover::before {
+  left: 100%;
+}
+
+.btn-fantasy:active {
+  transform: translateY(0);
+  box-shadow: 
+    0 2px 10px hsl(var(--primary) / 0.3),
+    inset 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Button with rune decorations */
+.btn-rune {
+  position: relative;
+  padding-left: 2.5rem;
+  padding-right: 2.5rem;
+  color: hsl(var(--foreground));
+}
+
+.btn-rune::after {
+  content: '⚜';
+  position: absolute;
+  left: 0.5rem;
+  font-size: 1.2rem;
+  opacity: 0.6;
+  transition: all 0.3s;
+}
+
+.btn-rune:hover::after {
+  opacity: 1;
+  transform: rotate(15deg) scale(1.2);
+  filter: drop-shadow(0 0 4px hsl(var(--accent)));
+}
+
+/* ============================================
+   RUNE DECORATIONS & MAGICAL EFFECTS
+   ============================================ */
+
+/* Rune border decoration */
+.rune-border {
+  position: relative;
+  padding: 1rem;
+}
+
+.rune-border::before,
+.rune-border::after {
+  content: '⚜';
+  position: absolute;
+  font-size: 1.5rem;
+  color: hsl(var(--accent) / 0.6);
+  opacity: 0.5;
+  animation: rune-glow 3s ease-in-out infinite;
+}
+
+.rune-border::before {
+  top: -0.5rem;
+  left: -0.5rem;
+}
+
+.rune-border::after {
+  bottom: -0.5rem;
+  right: -0.5rem;
+  transform: rotate(180deg);
+}
+
+@keyframes rune-glow {
+  0%, 100% {
+    opacity: 0.5;
+    filter: drop-shadow(0 0 4px hsl(var(--accent) / 0.5));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 12px hsl(var(--accent) / 0.8));
+  }
+}
+
+/* Magical spark particles */
+.spark-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.spark {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: hsl(var(--accent));
+  border-radius: 50%;
+  pointer-events: none;
+  animation: spark-float 3s ease-out infinite;
+  box-shadow: 0 0 6px hsl(var(--accent) / 0.8);
+}
+
+@keyframes spark-float {
+  0% {
+    opacity: 0;
+    transform: translateY(0) translateX(0) scale(0);
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-100px) translateX(20px) scale(1);
+  }
+}
+
+/* Magical aura effect */
+.aura-glow {
+  position: relative;
+}
+
+.aura-glow::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  background: radial-gradient(
+    circle,
+    hsl(var(--accent) / 0.3) 0%,
+    transparent 70%
+  );
+  border-radius: inherit;
+  animation: aura-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes aura-pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+}
+
+/* ============================================
+   ENHANCED CARD STYLES
+   ============================================ */
+
+/* Fantasy card with parchment effect */
+.card-fantasy {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--card) / 0.95),
+    hsl(var(--muted) / 0.9)
+  );
+  border: 2px solid hsl(var(--accent) / 0.4);
+  box-shadow: 
+    0 8px 32px hsl(var(--primary) / 0.2),
+    inset 0 1px 0 hsl(var(--primary) / 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.card-fantasy::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--accent) / 0.6),
+    hsl(var(--primary) / 0.6),
+    hsl(var(--accent) / 0.6),
+    transparent
+  );
+}
+
+.card-fantasy:hover {
+  border-color: hsl(var(--accent));
+  box-shadow: 
+    0 12px 48px hsl(var(--primary) / 0.3),
+    0 0 40px hsl(var(--accent) / 0.3),
+    inset 0 1px 0 hsl(var(--primary) / 0.2);
+  transform: translateY(-4px);
+}
+
+/* Quest card with scroll effect */
+.card-quest {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    hsl(var(--card) / 0.9),
+    hsl(var(--muted) / 0.85)
+  );
+  border-left: 4px solid hsl(var(--accent));
+  box-shadow: 
+    0 4px 20px hsl(var(--accent) / 0.2),
+    inset -2px 0 0 hsl(var(--accent) / 0.3);
+  transition: all 0.3s ease;
+}
+
+.card-quest::before {
+  content: '📜';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-size: 1.5rem;
+  opacity: 0.3;
+  transition: all 0.3s;
+}
+
+.card-quest:hover {
+  border-left-width: 6px;
+  box-shadow: 
+    0 8px 30px hsl(var(--accent) / 0.4),
+    inset -3px 0 0 hsl(var(--accent) / 0.5);
+  transform: translateX(4px);
+}
+
+.card-quest:hover::before {
+  opacity: 0.6;
+  transform: rotate(15deg) scale(1.2);
+}
+
+/* ============================================
+   INVENTORY-STYLE MENUS
+   ============================================ */
+
+.inventory-panel {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--background) / 0.95),
+    hsl(var(--muted) / 0.9)
+  );
+  border: 3px solid hsl(var(--accent) / 0.5);
+  border-radius: 12px;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 2px 8px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.inventory-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(
+    180deg,
+    hsl(var(--accent) / 0.3),
+    transparent
+  );
+  border-bottom: 2px solid hsl(var(--accent) / 0.4);
+}
+
+.inventory-item {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--card) / 0.6),
+    hsl(var(--muted) / 0.5)
+  );
+  border: 1px solid hsl(var(--border) / 0.5);
+  border-radius: 6px;
+  padding: 0.75rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.inventory-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    transparent,
+    hsl(var(--primary) / 0.1),
+    transparent
+  );
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.inventory-item:hover {
+  border-color: hsl(var(--accent));
+  box-shadow: 
+    0 4px 12px hsl(var(--accent) / 0.3),
+    inset 0 0 20px hsl(var(--primary) / 0.1);
+  transform: translateY(-2px);
+}
+
+.inventory-item:hover::before {
+  opacity: 1;
+}
+
+/* ============================================
+   ENHANCED PROGRESS BARS (HP/XP/MANA)
+   ============================================ */
+
+.progress-fantasy {
+  position: relative;
+  height: 24px;
+  background: linear-gradient(
+    180deg,
+    hsl(var(--muted)),
+    hsl(var(--background))
+  );
+  border: 2px solid hsl(var(--border));
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.3),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.progress-fantasy::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.1) 2px,
+      rgba(0, 0, 0, 0.1) 4px
+    );
+  pointer-events: none;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--primary)),
+    hsl(var(--accent)),
+    hsl(var(--primary))
+  );
+  background-size: 200% 100%;
+  animation: progress-flow 2s linear infinite;
+  box-shadow: 
+    inset 0 -2px 4px rgba(255, 255, 255, 0.2),
+    0 0 10px hsl(var(--primary) / 0.5);
+  position: relative;
+  transition: width 0.5s ease-out;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.3),
+    transparent 50%,
+    rgba(0, 0, 0, 0.2)
+  );
+}
+
+@keyframes progress-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+/* Low health warning */
+.progress-fantasy.low-health .progress-fill {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--destructive)),
+    hsl(0, 70%, 50%),
+    hsl(var(--destructive))
+  );
+  animation: progress-flow 1s linear infinite, pulse-danger 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-danger {
+  0%, 100% {
+    box-shadow: 
+      inset 0 -2px 4px rgba(255, 255, 255, 0.2),
+      0 0 10px hsl(var(--destructive) / 0.5);
+  }
+  50% {
+    box-shadow: 
+      inset 0 -2px 4px rgba(255, 255, 255, 0.2),
+      0 0 20px hsl(var(--destructive) / 0.8);
+  }
+}
+
+/* ============================================
+   LIGHT THEME ADJUSTMENTS
+   ============================================ */
+
+.light .parchment-bg {
+  background-image: 
+    url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, 
+      hsl(45 15% 98% / 0.95) 0%,
+      hsl(45 10% 96% / 0.9) 50%,
+      hsl(45 15% 98% / 0.95) 100%
+    );
+}
+
+.light .card-fantasy {
+  box-shadow: 
+    0 8px 32px rgba(139, 90, 43, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border-color: hsl(35 60% 45% / 0.3);
+}
+
+.light .text-mystical {
+  text-shadow: 
+    0 0 4px hsl(var(--accent) / 0.3),
+    0 0 8px hsl(var(--primary) / 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  color: hsl(var(--foreground));
+}
+
+.light .text-glow-primary {
+  text-shadow: 
+    0 0 3px hsl(var(--primary) / 0.4),
+    0 0 6px hsl(var(--primary) / 0.3),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  color: hsl(var(--primary));
+}
+
+.light .text-glow-accent {
+  text-shadow: 
+    0 0 3px hsl(var(--accent) / 0.4),
+    0 0 6px hsl(var(--accent) / 0.3),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  color: hsl(var(--accent));
+}
+
+.light .btn-fantasy {
+  border-color: hsl(var(--accent) / 0.7);
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.3),
+    hsl(var(--accent) / 0.25)
+  );
+  color: hsl(var(--foreground)) !important;
+  font-weight: 600;
+}
+
+.light .btn-fantasy:hover {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.4),
+    hsl(var(--accent) / 0.35)
+  );
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--accent));
+}
+
+.light .btn-rune {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.35),
+    hsl(var(--accent) / 0.3)
+  );
+  border-color: hsl(var(--accent) / 0.8);
+  color: hsl(var(--foreground)) !important;
+  font-weight: 700;
+}
+
+.light .btn-rune:hover {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary) / 0.45),
+    hsl(var(--accent) / 0.4)
+  );
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--accent));
+}
+
+.light .rune-border::before,
+.light .rune-border::after {
+  color: hsl(var(--accent) / 0.5);
+}
+
+/* ============================================
+   TAVERN DARK MODE VARIANT (Optional)
+   ============================================ */
+
+.tavern-mode {
+  --background: 25 15% 8%;
+  --foreground: 35 20% 85%;
+  --card: 25 15% 12%;
+  --muted: 25 15% 15%;
+  --accent: 35 60% 55%;
+  --primary: 25 50% 45%;
+  --border: 25 15% 20%;
+}
+
+.tavern-mode .parchment-bg {
+  background-image: 
+    url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, 
+      hsl(25 15% 12% / 0.98) 0%,
+      hsl(25 15% 10% / 0.95) 50%,
+      hsl(25 15% 12% / 0.98) 100%
+    );
+}
+
+.tavern-mode .card-fantasy {
+  box-shadow: 
+    0 8px 32px rgba(139, 90, 43, 0.3),
+    inset 0 1px 0 rgba(255, 200, 150, 0.1);
+  border-color: hsl(35 60% 45% / 0.4);
+}
+
+/* Candle flicker effect for tavern mode */
+@keyframes candle-flicker {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(1);
+  }
+  25% {
+    opacity: 0.9;
+    filter: brightness(0.95);
+  }
+  50% {
+    opacity: 0.85;
+    filter: brightness(0.9);
+  }
+  75% {
+    opacity: 0.95;
+    filter: brightness(0.98);
+  }
+}
+
+.tavern-mode .text-glow-accent {
+  animation: candle-flicker 3s ease-in-out infinite;
+}
+
+/* ============================================
+   ACCESSIBILITY ENHANCEMENTS
+   ============================================ */
+
+/* Ensure animations respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .card-fantasy,
+  .btn-fantasy,
+  .inventory-item {
+    border-width: 3px;
+  }
+  
+  .text-mystical,
+  .text-glow-primary,
+  .text-glow-accent {
+    text-shadow: 0 0 2px currentColor;
+  }
+}
+
